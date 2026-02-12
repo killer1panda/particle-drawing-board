@@ -5,8 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Hand → 3D Particle Drawing Board HD</title>
   <style>
-    body { margin:0; overflow:hidden; background:#000; }
+    * { box-sizing: border-box; }
+    body { margin:0; overflow:hidden; background:#000; font-family:Arial, sans-serif; }
     canvas { display:block; }
+    
     #ui { 
       position:absolute; 
       top:20px; 
@@ -23,6 +25,7 @@
     }
     #ui h1 { margin:0 0 10px 0; font-size:20px; }
     #ui p { margin:4px 0; font-size:12px; opacity:0.9; }
+    
     #modeIndicator { 
       position:absolute; 
       top:20px; 
@@ -39,6 +42,7 @@
       border-radius:12px; 
       border:2px solid currentColor;
     }
+    
     #video { 
       position:absolute; 
       bottom:20px; 
@@ -50,6 +54,7 @@
       opacity:0.8; 
       z-index:5;
     }
+    
     #fps {
       position:absolute;
       top:20px;
@@ -61,6 +66,7 @@
       text-shadow:0 0 10px #0f0;
       z-index:10;
     }
+    
     #loading {
       position:absolute;
       top:50%;
@@ -72,11 +78,168 @@
       text-shadow:0 0 20px #0ff;
       z-index:100;
     }
+    
+    /* Settings Button */
+    #settingsBtn {
+      position:absolute;
+      bottom:20px;
+      left:20px;
+      width:50px;
+      height:50px;
+      border-radius:50%;
+      background:rgba(0,0,0,0.6);
+      border:2px solid #0ff;
+      color:#0ff;
+      font-size:24px;
+      cursor:pointer;
+      z-index:50;
+      transition:all 0.3s;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    #settingsBtn:hover {
+      background:rgba(0,255,255,0.2);
+      box-shadow:0 0 20px rgba(0,255,255,0.5);
+      transform:scale(1.1);
+    }
+    
+    /* Settings Panel */
+    #settingsPanel {
+      position:absolute;
+      top:50%;
+      left:50%;
+      transform:translate(-50%, -50%);
+      background:rgba(10,10,30,0.95);
+      backdrop-filter:blur(20px);
+      -webkit-backdrop-filter:blur(20px);
+      border:1px solid rgba(0,255,255,0.3);
+      border-radius:16px;
+      padding:25px;
+      min-width:340px;
+      z-index:100;
+      display:none;
+      box-shadow:0 0 40px rgba(0,255,255,0.2);
+    }
+    #settingsPanel.active { display:block; }
+    
+    .settings-header {
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      margin-bottom:20px;
+      border-bottom:1px solid rgba(0,255,255,0.2);
+      padding-bottom:15px;
+    }
+    .settings-header h2 {
+      color:#0ff;
+      margin:0;
+      font-size:20px;
+      text-shadow:0 0 10px #0ff;
+    }
+    
+    #closeSettings {
+      background:none;
+      border:none;
+      color:#0ff;
+      font-size:28px;
+      cursor:pointer;
+      transition:transform 0.2s;
+    }
+    #closeSettings:hover { transform:rotate(90deg); }
+    
+    .settings-group {
+      margin:18px 0;
+    }
+    .settings-group label {
+      color:#fff;
+      font-size:14px;
+      display:block;
+      margin-bottom:8px;
+    }
+    .settings-group label span {
+      color:#0ff;
+      font-weight:bold;
+    }
+    
+    .settings-group input[type="range"] {
+      width:100%;
+      height:6px;
+      -webkit-appearance:none;
+      appearance:none;
+      background:rgba(0,255,255,0.2);
+      border-radius:3px;
+      outline:none;
+    }
+    .settings-group input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance:none;
+      width:18px;
+      height:18px;
+      background:#0ff;
+      border-radius:50%;
+      cursor:pointer;
+      box-shadow:0 0 10px #0ff;
+      transition:transform 0.2s;
+    }
+    .settings-group input[type="range"]::-webkit-slider-thumb:hover {
+      transform:scale(1.2);
+    }
+    
+    .settings-group select {
+      width:100%;
+      padding:10px;
+      background:rgba(0,0,0,0.5);
+      border:1px solid rgba(0,255,255,0.3);
+      border-radius:8px;
+      color:#fff;
+      font-size:14px;
+      cursor:pointer;
+    }
+    .settings-group select:focus {
+      outline:none;
+      border-color:#0ff;
+      box-shadow:0 0 10px rgba(0,255,255,0.3);
+    }
+    
+    #resetSettings {
+      width:100%;
+      padding:12px;
+      margin-top:20px;
+      background:linear-gradient(135deg, #0ff, #00f);
+      border:none;
+      border-radius:8px;
+      color:#000;
+      font-weight:bold;
+      font-size:14px;
+      cursor:pointer;
+      transition:transform 0.2s, box-shadow 0.2s;
+    }
+    #resetSettings:hover {
+      transform:scale(1.02);
+      box-shadow:0 0 20px rgba(0,255,255,0.5);
+    }
+    
+    /* Keyboard shortcuts hint */
+    .shortcuts-hint {
+      margin-top:15px;
+      padding-top:15px;
+      border-top:1px solid rgba(0,255,255,0.2);
+      font-size:11px;
+      color:rgba(255,255,255,0.6);
+    }
+    .shortcuts-hint kbd {
+      background:rgba(0,255,255,0.2);
+      padding:2px 6px;
+      border-radius:4px;
+      font-family:monospace;
+      color:#0ff;
+    }
   </style>
 </head>
 <body>
 
 <div id="loading">Loading camera...</div>
+
 <div id="ui">
   <h1>3D Particle Sketchpad HD</h1>
   <p>Point with index finger to draw<br>
@@ -84,27 +247,136 @@
      Show 1-4 fingers for different modes<br>
      Wave left/right to change colors</p>
 </div>
+
 <div id="modeIndicator">🎆 Fireworks</div>
 <div id="fps">60 FPS</div>
 <video id="video" autoplay playsinline muted></video>
 
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<button id="settingsBtn" title="Settings (S)">⚙️</button>
+
+<div id="settingsPanel">
+  <div class="settings-header">
+    <h2>⚙️ Settings</h2>
+    <button id="closeSettings" title="Close">×</button>
+  </div>
+  
+  <div class="settings-group">
+    <label>Bloom Intensity: <span id="bloomValue">1.5</span></label>
+    <input type="range" id="bloomSlider" min="0" max="3" step="0.1" value="1.5">
+  </div>
+  
+  <div class="settings-group">
+    <label>Bloom Radius: <span id="bloomRadiusValue">0.4</span></label>
+    <input type="range" id="bloomRadiusSlider" min="0" max="2" step="0.1" value="0.4">
+  </div>
+  
+  <div class="settings-group">
+    <label>Hand Smoothing: <span id="smoothingValue">0.3</span></label>
+    <input type="range" id="smoothingSlider" min="0.1" max="0.8" step="0.05" value="0.3">
+  </div>
+  
+  <div class="settings-group">
+    <label>Trail Length: <span id="trailValue">15</span></label>
+    <input type="range" id="trailSlider" min="0" max="30" step="1" value="15">
+  </div>
+  
+  <div class="settings-group">
+    <label>Particle Size: <span id="sizeValue">1.5</span></label>
+    <input type="range" id="sizeSlider" min="0.5" max="4" step="0.1" value="1.5">
+  </div>
+  
+  <div class="settings-group">
+    <label>Color Theme</label>
+    <select id="themeSelect">
+      <option value="rainbow">🌈 Rainbow</option>
+      <option value="fire">🔥 Fire</option>
+      <option value="ocean">🌊 Ocean</option>
+      <option value="neon">💜 Neon</option>
+      <option value="nature">🌿 Nature</option>
+      <option value="sunset">🌅 Sunset</option>
+    </select>
+  </div>
+  
+  <div class="settings-group">
+    <label>
+      <input type="checkbox" id="handMapToggle" checked> Show Hand Skeleton
+    </label>
+  </div>
+  
+  <button id="resetSettings">Reset to Defaults</button>
+  
+  <div class="shortcuts-hint">
+    <kbd>S</kbd> Settings &nbsp; <kbd>B</kbd> Bloom &nbsp; <kbd>T</kbd> Theme<br>
+    <kbd>1-4</kbd> Modes &nbsp; <kbd>Space</kbd> Clear &nbsp; <kbd>M</kbd> Hand Map
+  </div>
+</div>
+
+<!-- Three.js with ES Modules via importmap -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
 
-<script>
+<script type="module">
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+// =============== SETTINGS STATE ===============
+const settings = {
+  bloomStrength: 1.5,
+  bloomRadius: 0.4,
+  bloomThreshold: 0.85,
+  trailLength: 15,
+  particleSize: 1.5,
+  colorTheme: 'rainbow',
+  showHandMap: true,  // Hand skeleton visualization
+  smoothingFactor: 0.3  // Hand position smoothing (lower = smoother)
+};
+
+// Color themes
+const colorThemes = {
+  rainbow: { hueStart: 0, hueEnd: 1, saturation: 0.9, lightness: 0.6 },
+  fire: { hueStart: 0, hueEnd: 0.15, saturation: 1.0, lightness: 0.55 },
+  ocean: { hueStart: 0.5, hueEnd: 0.7, saturation: 0.8, lightness: 0.5 },
+  neon: { hueStart: 0.75, hueEnd: 1.0, saturation: 1.0, lightness: 0.6 },
+  nature: { hueStart: 0.2, hueEnd: 0.45, saturation: 0.7, lightness: 0.45 },
+  sunset: { hueStart: 0.0, hueEnd: 0.12, saturation: 0.95, lightness: 0.6 }
+};
+
 // =============== THREE.JS SCENE ===============
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x000510);
 const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 200);
 camera.position.set(0, 8, 45);
 
-const renderer = new THREE.WebGLRenderer({antialias:false, alpha:false, powerPreference:"high-performance"});
+const renderer = new THREE.WebGLRenderer({antialias:true, alpha:false, powerPreference:"high-performance"});
 renderer.setSize(innerWidth, innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2.5));
+renderer.toneMapping = THREE.ReinhardToneMapping;
+renderer.toneMappingExposure = 1.5;
 document.body.appendChild(renderer.domElement);
+
+// =============== POST-PROCESSING (BLOOM) ===============
+const composer = new EffectComposer(renderer);
+const renderPass = new RenderPass(scene, camera);
+composer.addPass(renderPass);
+
+const bloomPass = new UnrealBloomPass(
+  new THREE.Vector2(window.innerWidth, window.innerHeight),
+  settings.bloomStrength,
+  settings.bloomRadius,
+  settings.bloomThreshold
+);
+composer.addPass(bloomPass);
 
 // =============== PARTICLE SPRITE ===============
 function createParticleTexture() {
@@ -115,8 +387,9 @@ function createParticleTexture() {
   
   const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
   gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
-  gradient.addColorStop(0.3, 'rgba(255, 255, 255, 0.7)');
-  gradient.addColorStop(0.7, 'rgba(255, 255, 255, 0.2)');
+  gradient.addColorStop(0.2, 'rgba(255, 255, 255, 0.9)');
+  gradient.addColorStop(0.4, 'rgba(255, 255, 255, 0.5)');
+  gradient.addColorStop(0.7, 'rgba(255, 255, 255, 0.15)');
   gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
   
   ctx.fillStyle = gradient;
@@ -147,20 +420,173 @@ particleGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 particleGeo.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
 
 const particleMat = new THREE.PointsMaterial({
-  size: 1.5,
+  size: settings.particleSize,
   vertexColors: true,
   transparent: true,
   opacity: 0.9,
   blending: THREE.AdditiveBlending,
   depthWrite: false,
-  map: particleSprite
+  map: particleSprite,
+  sizeAttenuation: true
 });
 
 const particles = new THREE.Points(particleGeo, particleMat);
 scene.add(particles);
 
+// =============== HAND MAPPING VISUALIZATION ===============
+// Hand landmark connections (MediaPipe hand skeleton)
+const HAND_CONNECTIONS = [
+  [0, 1], [1, 2], [2, 3], [3, 4],       // Thumb
+  [0, 5], [5, 6], [6, 7], [7, 8],       // Index finger
+  [0, 9], [9, 10], [10, 11], [11, 12],  // Middle finger
+  [0, 13], [13, 14], [14, 15], [15, 16], // Ring finger
+  [0, 17], [17, 18], [18, 19], [19, 20], // Pinky
+  [5, 9], [9, 13], [13, 17], [0, 17]    // Palm
+];
+
+// Create hand visualization objects for 2 hands
+const handVisuals = [];
+
+function createHandVisualization(colorHue) {
+  const group = new THREE.Group();
+  
+  // Landmark points (21 joints)
+  const landmarkGeo = new THREE.BufferGeometry();
+  const landmarkPositions = new Float32Array(21 * 3);
+  const landmarkColors = new Float32Array(21 * 3);
+  
+  landmarkGeo.setAttribute('position', new THREE.BufferAttribute(landmarkPositions, 3));
+  landmarkGeo.setAttribute('color', new THREE.BufferAttribute(landmarkColors, 3));
+  
+  const landmarkMat = new THREE.PointsMaterial({
+    size: 0.8,
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.9,
+    blending: THREE.AdditiveBlending,
+    map: particleSprite
+  });
+  
+  const landmarks = new THREE.Points(landmarkGeo, landmarkMat);
+  group.add(landmarks);
+  
+  // Connection lines
+  const lineGeo = new THREE.BufferGeometry();
+  const linePositions = new Float32Array(HAND_CONNECTIONS.length * 6); // 2 points per connection, 3 coords each
+  lineGeo.setAttribute('position', new THREE.BufferAttribute(linePositions, 3));
+  
+  const lineMat = new THREE.LineBasicMaterial({
+    color: new THREE.Color().setHSL(colorHue, 0.8, 0.6),
+    transparent: true,
+    opacity: 0.6,
+    blending: THREE.AdditiveBlending
+  });
+  
+  const lines = new THREE.LineSegments(lineGeo, lineMat);
+  group.add(lines);
+  
+  scene.add(group);
+  
+  return {
+    group,
+    landmarks,
+    lines,
+    landmarkGeo,
+    lineGeo,
+    visible: true
+  };
+}
+
+// Create visualizations for 2 hands
+handVisuals.push(createHandVisualization(0.5)); // Hand 1 - cyan
+handVisuals.push(createHandVisualization(0.0)); // Hand 2 - red
+
+// Toggle hand visualization
+function toggleHandVisualization() {
+  settings.showHandMap = !settings.showHandMap;
+  handVisuals.forEach(hv => {
+    hv.group.visible = settings.showHandMap;
+  });
+}
+
+// Update hand visualization from landmarks
+function updateHandVisualization(handIndex, landmarks) {
+  if (!landmarks || handIndex >= handVisuals.length) return;
+  
+  const hv = handVisuals[handIndex];
+  if (!hv.group.visible) return;
+  
+  const landmarkPos = hv.landmarkGeo.attributes.position.array;
+  const landmarkColors = hv.landmarkGeo.attributes.color.array;
+  const linePos = hv.lineGeo.attributes.position.array;
+  
+  // Update landmark positions
+  for (let i = 0; i < 21; i++) {
+    const lm = landmarks[i];
+    // Convert to 3D space coordinates (same mapping as particle positions)
+    const x = (1 - lm.x - 0.5) * 80;
+    const y = (0.5 - lm.y) * 60;
+    const z = lm.z * -50;
+    
+    landmarkPos[i * 3] = x;
+    landmarkPos[i * 3 + 1] = y;
+    landmarkPos[i * 3 + 2] = z;
+    
+    // Color based on finger (different colors for each finger)
+    let hue;
+    if (i <= 4) hue = 0.0;       // Thumb - red
+    else if (i <= 8) hue = 0.15; // Index - orange
+    else if (i <= 12) hue = 0.3; // Middle - green
+    else if (i <= 16) hue = 0.5; // Ring - cyan
+    else hue = 0.75;             // Pinky - purple
+    
+    const color = new THREE.Color().setHSL(hue, 0.9, 0.6);
+    landmarkColors[i * 3] = color.r;
+    landmarkColors[i * 3 + 1] = color.g;
+    landmarkColors[i * 3 + 2] = color.b;
+  }
+  
+  // Update line connections
+  for (let i = 0; i < HAND_CONNECTIONS.length; i++) {
+    const [start, end] = HAND_CONNECTIONS[i];
+    
+    // Start point
+    linePos[i * 6] = landmarkPos[start * 3];
+    linePos[i * 6 + 1] = landmarkPos[start * 3 + 1];
+    linePos[i * 6 + 2] = landmarkPos[start * 3 + 2];
+    
+    // End point
+    linePos[i * 6 + 3] = landmarkPos[end * 3];
+    linePos[i * 6 + 4] = landmarkPos[end * 3 + 1];
+    linePos[i * 6 + 5] = landmarkPos[end * 3 + 2];
+  }
+  
+  hv.landmarkGeo.attributes.position.needsUpdate = true;
+  hv.landmarkGeo.attributes.color.needsUpdate = true;
+  hv.lineGeo.attributes.position.needsUpdate = true;
+}
+
+// =============== TRAIL SYSTEM ===============
+const TRAIL_MAX_LENGTH = 30;
+const trailHistory1 = [];
+const trailHistory2 = [];
+
+function updateTrail(trailHistory, x, y, z) {
+  trailHistory.unshift({ x, y, z, time: performance.now() });
+  if (trailHistory.length > settings.trailLength) {
+    trailHistory.pop();
+  }
+  return trailHistory;
+}
+
+function getThemeColor(hueOffset = 0) {
+  const theme = colorThemes[settings.colorTheme];
+  const hue = theme.hueStart + (theme.hueEnd - theme.hueStart) * ((hueOffset + Math.random() * 0.2) % 1);
+  return new THREE.Color().setHSL(hue, theme.saturation, theme.lightness);
+}
+
 // =============== EMIT PARTICLE ===============
-function emitParticle(x,y,z, vx, vy, vz, hue, baseSize, customColor){
+function emitParticle(x, y, z, vx, vy, vz, hue, baseSize, customColor) {
   if(particleCount >= MAX_PARTICLES) particleCount = 0;
 
   const i = particleCount;
@@ -177,7 +603,7 @@ function emitParticle(x,y,z, vx, vy, vz, hue, baseSize, customColor){
     colors[i*3+1] = customColor.g;
     colors[i*3+2] = customColor.b;
   } else {
-    const c = new THREE.Color().setHSL(hue, 0.9, 0.6);
+    const c = getThemeColor(hue);
     colors[i*3] = c.r;
     colors[i*3+1] = c.g;
     colors[i*3+2] = c.b;
@@ -189,6 +615,38 @@ function emitParticle(x,y,z, vx, vy, vz, hue, baseSize, customColor){
   particleCount = (particleCount + 1) % MAX_PARTICLES;
 }
 
+// =============== EMIT TRAIL PARTICLES ===============
+function emitTrailParticles(trailHistory, mode) {
+  if (trailHistory.length < 2) return;
+  
+  for (let i = 1; i < trailHistory.length; i++) {
+    const prev = trailHistory[i - 1];
+    const curr = trailHistory[i];
+    const age = (performance.now() - curr.time) / 1000;
+    
+    if (age < 0.15) {
+      const alpha = 1 - (i / trailHistory.length);
+      const count = Math.floor(2 * alpha);
+      
+      for (let j = 0; j < count; j++) {
+        const hue = i / trailHistory.length;
+        const color = getThemeColor(hue);
+        emitParticle(
+          curr.x + (Math.random() - 0.5) * 0.3,
+          curr.y + (Math.random() - 0.5) * 0.3,
+          curr.z + (Math.random() - 0.5) * 0.2,
+          (curr.x - prev.x) * 0.3,
+          (curr.y - prev.y) * 0.3,
+          (curr.z - prev.z) * 0.2,
+          hue,
+          0.3 * alpha,
+          color
+        );
+      }
+    }
+  }
+}
+
 // =============== MODE EMITTERS ===============
 function emitFireworks(x, y, z, dx, dy, dz, depthScale, hue){
   const count = 5 + Math.floor(Math.random() * 8);
@@ -196,45 +654,100 @@ function emitFireworks(x, y, z, dx, dy, dz, depthScale, hue){
     const angle = Math.random() * Math.PI * 2;
     const elev = (Math.random()-0.5) * Math.PI;
     const speed = 1.5 + Math.random() * 2;
+    const color = getThemeColor(hue);
     emitParticle(
       x, y, z,
       Math.cos(angle)*Math.cos(elev)*speed,
       Math.sin(elev)*speed,
       Math.sin(angle)*Math.cos(elev)*speed,
-      hue, 0.8 + depthScale
+      hue, 0.8 + depthScale, color
     );
   }
 }
 
 function emitHeart(x, y, z, dx, dy, dz, depthScale, hue){
-  const count = 3 + Math.floor(Math.random() * 5);
+  // Emit multiple particles to form a clear heart shape
+  const count = 8 + Math.floor(Math.random() * 6);
+  
   for(let i=0; i<count; i++){
-    const t = Math.random() * Math.PI * 2;
-    const hx = 16 * Math.pow(Math.sin(t), 3) * 0.1;
-    const hy = (13*Math.cos(t) - 5*Math.cos(2*t) - 2*Math.cos(3*t) - Math.cos(4*t)) * 0.1;
-    const color = new THREE.Color().setHSL(0.95 + Math.random()*0.1, 0.8, 0.6);
+    // Parametric heart equation
+    const t = (i / count) * Math.PI * 2;
+    
+    // Heart shape: x = 16sin³(t), y = 13cos(t) - 5cos(2t) - 2cos(3t) - cos(4t)
+    const scale = 0.15 * (1 + depthScale * 0.3);
+    const hx = 16 * Math.pow(Math.sin(t), 3) * scale;
+    const hy = (13*Math.cos(t) - 5*Math.cos(2*t) - 2*Math.cos(3*t) - Math.cos(4*t)) * scale;
+    
+    // Pink/red colors for heart
+    const heartHue = 0.95 + Math.random() * 0.08;
+    const color = getThemeColor(heartHue);
+    
+    // Particles move slightly outward and upward from heart shape
     emitParticle(
-      x + hx, y + hy, z,
-      hx*0.3, hy*0.3, (Math.random()-0.5)*0.2,
-      0.95, 0.6 + depthScale*0.5, color
+      x + hx, y + hy, z + (Math.random()-0.5) * 0.3,
+      hx * 0.15,  // Gentle outward motion
+      hy * 0.1 + 0.2,  // Slight upward float
+      (Math.random()-0.5) * 0.15,
+      heartHue, 0.7 + depthScale * 0.3, color
     );
   }
+  
+  // Add a center glow particle
+  const centerColor = new THREE.Color().setHSL(0.98, 1, 0.7);
+  emitParticle(x, y + 0.5, z, 0, 0.3, 0, 0.98, 1.2, centerColor);
 }
 
 function emitRing(x, y, z, dx, dy, dz, depthScale, hue){
-  const count = 4 + Math.floor(Math.random() * 6);
-  for(let i=0; i<count; i++){
-    const angle = Math.random() * Math.PI * 2;
-    const radius = 1 + Math.random() * 1.5;
-    const rx = Math.cos(angle) * radius;
-    const rz = Math.sin(angle) * radius * 0.5;
-    const color = new THREE.Color().setHSL(0.1 + Math.random()*0.08, 0.8, 0.6);
+  // Create a perfect circular ring (like Saturn's rings viewed from angle)
+  const particlesPerRing = 20; // More particles for continuous ring
+  const ringRadius = 2.0; // Fixed radius for clear shape
+  const scale = 0.5 * (1 + depthScale * 0.2);
+  
+  // Main ring - perfect circle in XZ plane with slight Y tilt
+  for(let i = 0; i < particlesPerRing; i++){
+    const angle = (i / particlesPerRing) * Math.PI * 2;
+    
+    // Perfect circle in XZ plane
+    const rx = Math.cos(angle) * ringRadius * scale;
+    const rz = Math.sin(angle) * ringRadius * scale;
+    // Slight Y variation for 3D depth illusion (tilted ring effect)
+    const ry = Math.sin(angle) * 0.3 * scale;
+    
+    // Golden/amber colors for ring
+    const ringHue = 0.08 + (i / particlesPerRing) * 0.05;
+    const color = getThemeColor(ringHue);
+    
+    // Particles stay in ring formation with slow rotation
     emitParticle(
-      x + rx*0.3, y, z + rz*0.3,
-      -Math.sin(angle)*0.5, (Math.random()-0.5)*0.2, Math.cos(angle)*0.5,
-      0.1, 0.6 + depthScale*0.5, color
+      x + rx, y + ry, z + rz,
+      -Math.sin(angle) * 0.2,  // Slow orbit motion
+      0.05,                     // Slight upward drift
+      Math.cos(angle) * 0.2,
+      ringHue, 0.6 + depthScale * 0.2, color
     );
   }
+  
+  // Inner ring for depth
+  const innerRadius = 1.2 * scale;
+  for(let i = 0; i < 12; i++){
+    const angle = (i / 12) * Math.PI * 2 + 0.2; // Offset angle
+    const rx = Math.cos(angle) * innerRadius;
+    const rz = Math.sin(angle) * innerRadius;
+    const ry = Math.sin(angle) * 0.2 * scale;
+    
+    const color = getThemeColor(0.12);
+    emitParticle(
+      x + rx, y + ry, z + rz,
+      -Math.sin(angle) * 0.15,
+      0.03,
+      Math.cos(angle) * 0.15,
+      0.12, 0.5, color
+    );
+  }
+  
+  // Center core (planet)
+  const coreColor = new THREE.Color().setHSL(0.1, 0.9, 0.5);
+  emitParticle(x, y, z, 0, 0.05, 0, 0.1, 0.8, coreColor);
 }
 
 function emitFlower(x, y, z, dx, dy, dz, depthScale, hue){
@@ -245,7 +758,7 @@ function emitFlower(x, y, z, dx, dy, dz, depthScale, hue){
     if(r > 0){
       const fx = r * Math.cos(theta);
       const fy = r * Math.sin(theta);
-      const color = new THREE.Color().setHSL([0.05, 0.15, 0.85, 0.3][Math.floor(Math.random()*4)], 0.7, 0.7);
+      const color = getThemeColor([0.05, 0.15, 0.85, 0.3][Math.floor(Math.random()*4)]);
       emitParticle(
         x + fx*0.2, y + fy*0.2, z,
         Math.cos(theta)*1, Math.sin(theta)*1, (Math.random()-0.5)*0.3,
@@ -262,12 +775,13 @@ const prevPos2 = new THREE.Vector3();
 window.lastEmitTime1 = 0;
 window.lastEmitTime2 = 0;
 let frameCount = 0;
-let mode1 = 0;  // Mode for hand 1
-let mode2 = 1;  // Mode for hand 2
+let mode1 = 0;
+let mode2 = 1;
 
 function animate(){
   const dt = clock.getDelta();
   
+  // Update particles
   for(let i=0; i<MAX_PARTICLES; i++){
     if(lifetimes[i] > 0){
       lifetimes[i] -= dt;
@@ -280,16 +794,17 @@ function animate(){
       positions[i*3+2] += velocities[i*3+2] * dt * 3;
       
       const fade = lifetimes[i] / 2;
-      colors[i*3] *= fade;
-      colors[i*3+1] *= fade;
-      colors[i*3+2] *= fade;
+      colors[i*3] *= 0.998; // Slower fade for bloom effect
+      colors[i*3+1] *= 0.998;
+      colors[i*3+2] *= 0.998;
     }
   }
   
   particleGeo.attributes.position.needsUpdate = true;
   particleGeo.attributes.color.needsUpdate = true;
   
-  renderer.render(scene, camera);
+  // Render with bloom
+  composer.render();
   
   frameCount++;
   if(frameCount >= 15){
@@ -306,6 +821,7 @@ window.addEventListener('resize', ()=>{
   camera.aspect = innerWidth/innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
+  composer.setSize(innerWidth, innerHeight);
 });
 
 // =============== HAND TRACKING ===============
@@ -315,13 +831,84 @@ let mode = 0;
 
 const hands = new Hands({locateFile: file => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
 hands.setOptions({
-  maxNumHands: 2,  // Support 2 hands!
+  maxNumHands: 2,
   modelComplexity: 1,
   minDetectionConfidence: 0.65,
   minTrackingConfidence: 0.5
 });
 
-function processHand(landmarks, prevPos, lastEmitTime, handNum, handMode){
+// =============== HAND POSITION SMOOTHING SYSTEM ===============
+// Position buffer for smoothing jittery hand tracking
+const SMOOTHING_BUFFER_SIZE = 8;
+const handPositionBuffer1 = [];
+const handPositionBuffer2 = [];
+const handVelocityBuffer1 = [];
+const handVelocityBuffer2 = [];
+
+// Exponential moving average smoothing factor (0-1, lower = smoother)
+const SMOOTHING_FACTOR = 0.3;
+const VELOCITY_SMOOTHING = 0.2;
+
+function smoothPosition(buffer, newPos, smoothingFactor) {
+  // Add new position to buffer
+  buffer.push({ ...newPos, time: performance.now() });
+  if (buffer.length > SMOOTHING_BUFFER_SIZE) {
+    buffer.shift();
+  }
+  
+  if (buffer.length < 2) return newPos;
+  
+  // Apply exponential moving average
+  let smoothedX = buffer[0].x;
+  let smoothedY = buffer[0].y;
+  let smoothedZ = buffer[0].z;
+  
+  for (let i = 1; i < buffer.length; i++) {
+    smoothedX = smoothedX * (1 - smoothingFactor) + buffer[i].x * smoothingFactor;
+    smoothedY = smoothedY * (1 - smoothingFactor) + buffer[i].y * smoothingFactor;
+    smoothedZ = smoothedZ * (1 - smoothingFactor) + buffer[i].z * smoothingFactor;
+  }
+  
+  return { x: smoothedX, y: smoothedY, z: smoothedZ };
+}
+
+// Velocity-based prediction for smoother interpolation
+function predictPosition(posBuffer, velBuffer, currentPos) {
+  if (posBuffer.length < 3) return currentPos;
+  
+  // Calculate velocity from recent positions
+  const recent = posBuffer[posBuffer.length - 1];
+  const prev = posBuffer[posBuffer.length - 2];
+  const dt = (recent.time - prev.time) / 1000;
+  
+  if (dt <= 0) return currentPos;
+  
+  const velocity = {
+    x: (recent.x - prev.x) / dt,
+    y: (recent.y - prev.y) / dt,
+    z: (recent.z - prev.z) / dt
+  };
+  
+  // Smooth velocity
+  velBuffer.push(velocity);
+  if (velBuffer.length > 5) velBuffer.shift();
+  
+  const avgVel = velBuffer.reduce((acc, v) => ({
+    x: acc.x + v.x / velBuffer.length,
+    y: acc.y + v.y / velBuffer.length,
+    z: acc.z + v.z / velBuffer.length
+  }), { x: 0, y: 0, z: 0 });
+  
+  // Predict slightly ahead to reduce lag
+  const prediction = 0.016; // ~1 frame ahead
+  return {
+    x: currentPos.x + avgVel.x * prediction * 0.5,
+    y: currentPos.y + avgVel.y * prediction * 0.5,
+    z: currentPos.z + avgVel.z * prediction * 0.3
+  };
+}
+
+function processHand(landmarks, prevPos, lastEmitTime, handNum, handMode, trailHistory, posBuffer, velBuffer){
   if(!landmarks) return { pos: prevPos, mode: handMode };
   
   const idxTip = landmarks[8];
@@ -332,9 +919,23 @@ function processHand(landmarks, prevPos, lastEmitTime, handNum, handMode){
   const pinchDist = Math.hypot(thumbTip.x - idxTip.x, thumbTip.y - idxTip.y);
   const isPinched = pinchDist < 0.05;
   
-  const x = (1 - idxTip.x - 0.5) * 80;
-  const y = (0.5 - idxTip.y) * 60;
-  const z = idxTip.z * -50;
+  // Raw position from MediaPipe
+  const rawX = (1 - idxTip.x - 0.5) * 80;
+  const rawY = (0.5 - idxTip.y) * 60;
+  const rawZ = idxTip.z * -50;
+  
+  // Apply smoothing using settings value
+  const smoothed = smoothPosition(posBuffer, { x: rawX, y: rawY, z: rawZ }, settings.smoothingFactor);
+  const predicted = predictPosition(posBuffer, velBuffer, smoothed);
+  
+  const x = predicted.x;
+  const y = predicted.y;
+  const z = predicted.z;
+  
+  // Update trail
+  if (idxExtended && !isPinched) {
+    updateTrail(trailHistory, x, y, z);
+  }
   
   // Count fingers to determine mode
   let fingers = 0;
@@ -355,10 +956,10 @@ function processHand(landmarks, prevPos, lastEmitTime, handNum, handMode){
       const speed = Math.hypot(dx, dy);
       const depthScale = THREE.MathUtils.mapLinear(idxTip.z, -0.3, 0.3, 1.5, 0.6);
       
-      // Use hand's own hue offset
       const handHue = (handNum === 1) ? hue : (hue + 0.5) % 1;
       
-      const emitCount = Math.floor(1 + speed * 6);
+      // Interpolate between previous and current position for smoother drawing
+      const emitCount = Math.max(1, Math.floor(1 + speed * 6));
       for(let i=0; i<emitCount; i++){
         const lerp = i / emitCount;
         const px = prevPos.x + dx * lerp;
@@ -373,6 +974,11 @@ function processHand(landmarks, prevPos, lastEmitTime, handNum, handMode){
         }
       }
       
+      // Emit trail particles
+      if (settings.trailLength > 0) {
+        emitTrailParticles(trailHistory, currentMode);
+      }
+      
       window[emitKey] = now;
     }
     return { pos: new THREE.Vector3(x, y, z), mode: currentMode };
@@ -385,12 +991,29 @@ hands.onResults(results => {
   
   const handsDetected = results.multiHandLandmarks?.length || 0;
   
+  // Hide hand visualizations if no hands detected
   if(handsDetected === 0){
+    handVisuals.forEach(hv => hv.group.visible = false);
     return;
   }
   
-  // Process first hand
-  const result1 = processHand(results.multiHandLandmarks[0], prevPos1, null, 1, mode1);
+  // Update hand visualizations
+  if(settings.showHandMap){
+    updateHandVisualization(0, results.multiHandLandmarks[0]);
+    handVisuals[0].group.visible = true;
+    
+    if(results.multiHandLandmarks[1]){
+      updateHandVisualization(1, results.multiHandLandmarks[1]);
+      handVisuals[1].group.visible = true;
+    } else {
+      handVisuals[1].group.visible = false;
+    }
+  } else {
+    handVisuals.forEach(hv => hv.group.visible = false);
+  }
+  
+  // Process first hand with smoothing buffers
+  const result1 = processHand(results.multiHandLandmarks[0], prevPos1, null, 1, mode1, trailHistory1, handPositionBuffer1, handVelocityBuffer1);
   prevPos1.copy(result1.pos);
   mode1 = result1.mode;
   
@@ -399,23 +1022,23 @@ hands.onResults(results => {
   
   // Process second hand if present
   if(results.multiHandLandmarks[1]){
-    const result2 = processHand(results.multiHandLandmarks[1], prevPos2, null, 2, mode2);
+    const result2 = processHand(results.multiHandLandmarks[1], prevPos2, null, 2, mode2, trailHistory2, handPositionBuffer2, handVelocityBuffer2);
     prevPos2.copy(result2.pos);
     mode2 = result2.mode;
   }
   
   // Update mode indicator
   const names = ['🎆', '💖', '🪐', '🌸'];
-  const colors = ['#00ffff', '#ff69b4', '#ffd700', '#ffb6c1'];
+  const colorsArr = ['#00ffff', '#ff69b4', '#ffd700', '#ffb6c1'];
   const ind = document.getElementById('modeIndicator');
   
   if(results.multiHandLandmarks[1]){
     ind.textContent = names[mode1] + ' + ' + names[mode2];
-    ind.style.background = 'linear-gradient(45deg, ' + colors[mode1] + ', ' + colors[mode2] + ')';
+    ind.style.background = 'linear-gradient(45deg, ' + colorsArr[mode1] + ', ' + colorsArr[mode2] + ')';
     ind.style.color = '#fff';
   } else {
     ind.textContent = names[mode1] + ' ' + ['Fireworks','Heart','Ring','Flower'][mode1];
-    ind.style.color = colors[mode1];
+    ind.style.color = colorsArr[mode1];
     ind.style.background = 'rgba(0,0,0,0.6)';
   }
 });
@@ -437,6 +1060,180 @@ cam.start().then(() => {
   document.getElementById('loading').style.display = 'none';
 }).catch(err => {
   document.getElementById('loading').textContent = 'Camera error: ' + err.message;
+});
+
+// =============== SETTINGS PANEL ===============
+const settingsBtn = document.getElementById('settingsBtn');
+const settingsPanel = document.getElementById('settingsPanel');
+const closeSettings = document.getElementById('closeSettings');
+const bloomSlider = document.getElementById('bloomSlider');
+const bloomValue = document.getElementById('bloomValue');
+const bloomRadiusSlider = document.getElementById('bloomRadiusSlider');
+const bloomRadiusValue = document.getElementById('bloomRadiusValue');
+const trailSlider = document.getElementById('trailSlider');
+const trailValue = document.getElementById('trailValue');
+const sizeSlider = document.getElementById('sizeSlider');
+const sizeValue = document.getElementById('sizeValue');
+const themeSelect = document.getElementById('themeSelect');
+const resetSettings = document.getElementById('resetSettings');
+
+settingsBtn.addEventListener('click', () => {
+  settingsPanel.classList.toggle('active');
+});
+
+closeSettings.addEventListener('click', () => {
+  settingsPanel.classList.remove('active');
+});
+
+bloomSlider.addEventListener('input', (e) => {
+  settings.bloomStrength = parseFloat(e.target.value);
+  bloomValue.textContent = settings.bloomStrength.toFixed(1);
+  bloomPass.strength = settings.bloomStrength;
+});
+
+bloomRadiusSlider.addEventListener('input', (e) => {
+  settings.bloomRadius = parseFloat(e.target.value);
+  bloomRadiusValue.textContent = settings.bloomRadius.toFixed(1);
+  bloomPass.radius = settings.bloomRadius;
+});
+
+trailSlider.addEventListener('input', (e) => {
+  settings.trailLength = parseInt(e.target.value);
+  trailValue.textContent = settings.trailLength;
+});
+
+sizeSlider.addEventListener('input', (e) => {
+  settings.particleSize = parseFloat(e.target.value);
+  sizeValue.textContent = settings.particleSize.toFixed(1);
+  particleMat.size = settings.particleSize;
+});
+
+// Smoothing slider
+const smoothingSlider = document.getElementById('smoothingSlider');
+const smoothingValue = document.getElementById('smoothingValue');
+smoothingSlider.addEventListener('input', (e) => {
+  settings.smoothingFactor = parseFloat(e.target.value);
+  smoothingValue.textContent = settings.smoothingFactor.toFixed(2);
+});
+
+themeSelect.addEventListener('change', (e) => {
+  settings.colorTheme = e.target.value;
+});
+
+// Hand map toggle
+const handMapToggle = document.getElementById('handMapToggle');
+handMapToggle.addEventListener('change', (e) => {
+  settings.showHandMap = e.target.checked;
+  handVisuals.forEach(hv => hv.group.visible = settings.showHandMap);
+});
+
+resetSettings.addEventListener('click', () => {
+  settings.bloomStrength = 1.5;
+  settings.bloomRadius = 0.4;
+  settings.trailLength = 15;
+  settings.particleSize = 1.5;
+  settings.colorTheme = 'rainbow';
+  settings.showHandMap = true;
+  settings.smoothingFactor = 0.3;
+  
+  bloomSlider.value = 1.5;
+  bloomValue.textContent = '1.5';
+  bloomRadiusSlider.value = 0.4;
+  bloomRadiusValue.textContent = '0.4';
+  smoothingSlider.value = 0.3;
+  smoothingValue.textContent = '0.30';
+  trailSlider.value = 15;
+  trailValue.textContent = '15';
+  sizeSlider.value = 1.5;
+  sizeValue.textContent = '1.5';
+  themeSelect.value = 'rainbow';
+  handMapToggle.checked = true;
+  
+  bloomPass.strength = 1.5;
+  bloomPass.radius = 0.4;
+  particleMat.size = 1.5;
+  handVisuals.forEach(hv => hv.group.visible = true);
+  
+  // Clear position buffers for fresh start
+  handPositionBuffer1.length = 0;
+  handPositionBuffer2.length = 0;
+  handVelocityBuffer1.length = 0;
+  handVelocityBuffer2.length = 0;
+});
+
+// =============== KEYBOARD SHORTCUTS ===============
+document.addEventListener('keydown', (e) => {
+  // Don't trigger if typing in an input
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  
+  switch(e.key.toLowerCase()) {
+    case 's':
+      settingsPanel.classList.toggle('active');
+      break;
+      
+    case 'b':
+      // Cycle bloom: 0 → 1.5 → 3.0 → 0
+      const bloomValues = [0, 1.5, 3.0];
+      const currentIndex = bloomValues.indexOf(settings.bloomStrength);
+      settings.bloomStrength = bloomValues[(currentIndex + 1) % bloomValues.length];
+      bloomPass.strength = settings.bloomStrength;
+      bloomSlider.value = settings.bloomStrength;
+      bloomValue.textContent = settings.bloomStrength.toFixed(1);
+      break;
+      
+    case 't':
+      // Cycle themes
+      const themes = ['rainbow', 'fire', 'ocean', 'neon', 'nature', 'sunset'];
+      const themeIndex = themes.indexOf(settings.colorTheme);
+      settings.colorTheme = themes[(themeIndex + 1) % themes.length];
+      themeSelect.value = settings.colorTheme;
+      break;
+      
+    case 'r':
+      resetSettings.click();
+      break;
+      
+    case '1': case '2': case '3': case '4':
+      mode1 = parseInt(e.key) - 1;
+      break;
+      
+    case ' ':
+      e.preventDefault();
+      // Clear all particles
+      for(let i = 0; i < MAX_PARTICLES; i++) {
+        lifetimes[i] = -1;
+        positions[i * 3 + 1] = -999;
+      }
+      trailHistory1.length = 0;
+      trailHistory2.length = 0;
+      break;
+      
+    case 'h':
+      const videoEl = document.getElementById('video');
+      videoEl.style.display = videoEl.style.display === 'none' ? 'block' : 'none';
+      break;
+      
+    case 'f':
+      const fpsEl = document.getElementById('fps');
+      fpsEl.style.display = fpsEl.style.display === 'none' ? 'block' : 'none';
+      break;
+      
+    case 'm':
+      // Toggle hand skeleton visualization
+      settings.showHandMap = !settings.showHandMap;
+      document.getElementById('handMapToggle').checked = settings.showHandMap;
+      handVisuals.forEach(hv => hv.group.visible = settings.showHandMap);
+      break;
+  }
+});
+
+// Close settings panel when clicking outside
+document.addEventListener('click', (e) => {
+  if (settingsPanel.classList.contains('active') && 
+      !settingsPanel.contains(e.target) && 
+      e.target !== settingsBtn) {
+    settingsPanel.classList.remove('active');
+  }
 });
 </script>
 </body>
