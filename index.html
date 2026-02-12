@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hand → 3D Particle Drawing Board HD</title>
+  <style>
+    body { margin:0; overflow:hidden; background:#000; }
+    canvas { display:block; }
+    #ui { 
+      position:absolute; 
+      top:20px; 
+      left:20px; 
+      color:#0ff; 
+      font-family:Arial, sans-serif; 
+      pointer-events:none; 
+      text-shadow:0 0 10px #0ff; 
+      z-index:10;
+      background:rgba(0,0,0,0.5);
+      padding:15px 20px;
+      border-radius:12px;
+      border:1px solid rgba(0,255,255,0.3);
+    }
+    #ui h1 { margin:0 0 10px 0; font-size:20px; }
+    #ui p { margin:4px 0; font-size:12px; opacity:0.9; }
+    #modeIndicator { 
+      position:absolute; 
+      top:20px; 
+      right:20px; 
+      color:#fff; 
+      font-family:Arial; 
+      font-size:24px; 
+      font-weight:bold; 
+      pointer-events:none; 
+      text-shadow:0 0 15px currentColor; 
+      z-index:10; 
+      padding:15px 25px; 
+      background:rgba(0,0,0,0.6);
+      border-radius:12px; 
+      border:2px solid currentColor;
+    }
+    #video { 
+      position:absolute; 
+      bottom:20px; 
+      right:20px; 
+      width:220px; 
+      border:3px solid #0ff; 
+      border-radius:12px; 
+      transform:scaleX(-1); 
+      opacity:0.8; 
+      z-index:5;
+    }
+    #fps {
+      position:absolute;
+      top:20px;
+      left:50%;
+      transform:translateX(-50%);
+      color:#0f0;
+      font-family:monospace;
+      font-size:14px;
+      text-shadow:0 0 10px #0f0;
+      z-index:10;
+    }
+    #loading {
+      position:absolute;
+      top:50%;
+      left:50%;
+      transform:translate(-50%, -50%);
+      color:#0ff;
+      font-family:Arial;
+      font-size:24px;
+      text-shadow:0 0 20px #0ff;
+      z-index:100;
+    }
+  </style>
+</head>
+<body>
+
+<div id="loading">Loading camera...</div>
+<div id="ui">
+  <h1>3D Particle Sketchpad HD</h1>
+  <p>Point with index finger to draw<br>
+     Pinch thumb+index to lift<br>
+     Show 1-4 fingers for different modes<br>
+     Wave left/right to change colors</p>
+</div>
+<div id="modeIndicator">🎆 Fireworks</div>
+<div id="fps">60 FPS</div>
+<video id="video" autoplay playsinline muted></video>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+<script>
+// =============== THREE.JS SCENE ===============
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x000510);
+const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 200);
+camera.position.set(0, 8, 45);
+
+const renderer = new THREE.WebGLRenderer({antialias:false, alpha:false, powerPreference:"high-performance"});
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2.5));
+document.body.appendChild(renderer.domElement);
+
+// =============== PARTICLE SPRITE ===============
+function createParticleTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 64;
+  canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  
+  const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+  gradient.addColorStop(0.3, 'rgba(255, 255, 255, 0.7)');
+  gradient.addColorStop(0.7, 'rgba(255, 255, 255, 0.2)');
+  gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+  
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, 64, 64);
+  
+  return new THREE.CanvasTexture(canvas);
+}
+
+const particleSprite = createParticleTexture();
+
+// =============== PARTICLE SYSTEM ===============
+const MAX_PARTICLES = 50000;
+const particleGeo = new THREE.BufferGeometry();
+const positions = new Float32Array(MAX_PARTICLES * 3);
+const velocities = new Float32Array(MAX_PARTICLES * 3);
+const lifetimes = new Float32Array(MAX_PARTICLES);
+const colors = new Float32Array(MAX_PARTICLES * 3);
+const sizes = new Float32Array(MAX_PARTICLES);
+
+let particleCount = 0;
+
+for(let i=0; i<MAX_PARTICLES; i++){
+  lifetimes[i] = -1;
+}
+
+particleGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+particleGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+particleGeo.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+
+const particleMat = new THREE.PointsMaterial({
+  size: 1.5,
+  vertexColors: true,
+  transparent: true,
+  opacity: 0.9,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+  map: particleSprite
+});
+
+const particles = new THREE.Points(particleGeo, particleMat);
+scene.add(particles);
+
+// =============== EMIT PARTICLE ===============
+function emitParticle(x,y,z, vx, vy, vz, hue, baseSize, customColor){
+  if(particleCount >= MAX_PARTICLES) particleCount = 0;
+
+  const i = particleCount;
+  positions[i*3] = x;
+  positions[i*3+1] = y;
+  positions[i*3+2] = z;
+
+  velocities[i*3] = vx + (Math.random()-0.5)*0.3;
+  velocities[i*3+1] = vy + (Math.random()-0.5)*0.3;
+  velocities[i*3+2] = vz + (Math.random()-0.5)*0.2;
+
+  if(customColor){
+    colors[i*3] = customColor.r;
+    colors[i*3+1] = customColor.g;
+    colors[i*3+2] = customColor.b;
+  } else {
+    const c = new THREE.Color().setHSL(hue, 0.9, 0.6);
+    colors[i*3] = c.r;
+    colors[i*3+1] = c.g;
+    colors[i*3+2] = c.b;
+  }
+
+  sizes[i] = baseSize * (0.5 + Math.random()*0.5);
+  lifetimes[i] = 2 + Math.random()*1.5;
+
+  particleCount = (particleCount + 1) % MAX_PARTICLES;
+}
+
+// =============== MODE EMITTERS ===============
+function emitFireworks(x, y, z, dx, dy, dz, depthScale, hue){
+  const count = 5 + Math.floor(Math.random() * 8);
+  for(let i=0; i<count; i++){
+    const angle = Math.random() * Math.PI * 2;
+    const elev = (Math.random()-0.5) * Math.PI;
+    const speed = 1.5 + Math.random() * 2;
+    emitParticle(
+      x, y, z,
+      Math.cos(angle)*Math.cos(elev)*speed,
+      Math.sin(elev)*speed,
+      Math.sin(angle)*Math.cos(elev)*speed,
+      hue, 0.8 + depthScale
+    );
+  }
+}
+
+function emitHeart(x, y, z, dx, dy, dz, depthScale, hue){
+  const count = 3 + Math.floor(Math.random() * 5);
+  for(let i=0; i<count; i++){
+    const t = Math.random() * Math.PI * 2;
+    const hx = 16 * Math.pow(Math.sin(t), 3) * 0.1;
+    const hy = (13*Math.cos(t) - 5*Math.cos(2*t) - 2*Math.cos(3*t) - Math.cos(4*t)) * 0.1;
+    const color = new THREE.Color().setHSL(0.95 + Math.random()*0.1, 0.8, 0.6);
+    emitParticle(
+      x + hx, y + hy, z,
+      hx*0.3, hy*0.3, (Math.random()-0.5)*0.2,
+      0.95, 0.6 + depthScale*0.5, color
+    );
+  }
+}
+
+function emitRing(x, y, z, dx, dy, dz, depthScale, hue){
+  const count = 4 + Math.floor(Math.random() * 6);
+  for(let i=0; i<count; i++){
+    const angle = Math.random() * Math.PI * 2;
+    const radius = 1 + Math.random() * 1.5;
+    const rx = Math.cos(angle) * radius;
+    const rz = Math.sin(angle) * radius * 0.5;
+    const color = new THREE.Color().setHSL(0.1 + Math.random()*0.08, 0.8, 0.6);
+    emitParticle(
+      x + rx*0.3, y, z + rz*0.3,
+      -Math.sin(angle)*0.5, (Math.random()-0.5)*0.2, Math.cos(angle)*0.5,
+      0.1, 0.6 + depthScale*0.5, color
+    );
+  }
+}
+
+function emitFlower(x, y, z, dx, dy, dz, depthScale, hue){
+  const count = 5 + Math.floor(Math.random() * 8);
+  for(let i=0; i<count; i++){
+    const theta = Math.random() * Math.PI * 2;
+    const r = Math.cos(5*theta) * 1.5;
+    if(r > 0){
+      const fx = r * Math.cos(theta);
+      const fy = r * Math.sin(theta);
+      const color = new THREE.Color().setHSL([0.05, 0.15, 0.85, 0.3][Math.floor(Math.random()*4)], 0.7, 0.7);
+      emitParticle(
+        x + fx*0.2, y + fy*0.2, z,
+        Math.cos(theta)*1, Math.sin(theta)*1, (Math.random()-0.5)*0.3,
+        0.05, 0.8 + depthScale*0.5, color
+      );
+    }
+  }
+}
+
+// =============== ANIMATION LOOP ===============
+const clock = new THREE.Clock();
+const prevPos1 = new THREE.Vector3();
+const prevPos2 = new THREE.Vector3();
+window.lastEmitTime1 = 0;
+window.lastEmitTime2 = 0;
+let frameCount = 0;
+let mode1 = 0;  // Mode for hand 1
+let mode2 = 1;  // Mode for hand 2
+
+function animate(){
+  const dt = clock.getDelta();
+  
+  for(let i=0; i<MAX_PARTICLES; i++){
+    if(lifetimes[i] > 0){
+      lifetimes[i] -= dt;
+      if(lifetimes[i] <= 0){
+        positions[i*3+1] = -999;
+        continue;
+      }
+      positions[i*3] += velocities[i*3] * dt * 4;
+      positions[i*3+1] += velocities[i*3+1] * dt * 4;
+      positions[i*3+2] += velocities[i*3+2] * dt * 3;
+      
+      const fade = lifetimes[i] / 2;
+      colors[i*3] *= fade;
+      colors[i*3+1] *= fade;
+      colors[i*3+2] *= fade;
+    }
+  }
+  
+  particleGeo.attributes.position.needsUpdate = true;
+  particleGeo.attributes.color.needsUpdate = true;
+  
+  renderer.render(scene, camera);
+  
+  frameCount++;
+  if(frameCount >= 15){
+    document.getElementById('fps').textContent = Math.round(1/dt) + ' FPS';
+    frameCount = 0;
+  }
+  
+  requestAnimationFrame(animate);
+}
+
+animate();
+
+window.addEventListener('resize', ()=>{
+  camera.aspect = innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+// =============== HAND TRACKING ===============
+const video = document.getElementById('video');
+let hue = 0.6;
+let mode = 0;
+
+const hands = new Hands({locateFile: file => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
+hands.setOptions({
+  maxNumHands: 2,  // Support 2 hands!
+  modelComplexity: 1,
+  minDetectionConfidence: 0.65,
+  minTrackingConfidence: 0.5
+});
+
+function processHand(landmarks, prevPos, lastEmitTime, handNum, handMode){
+  if(!landmarks) return { pos: prevPos, mode: handMode };
+  
+  const idxTip = landmarks[8];
+  const idxPip = landmarks[6];
+  const idxExtended = idxTip.y < idxPip.y - 0.02;
+  
+  const thumbTip = landmarks[4];
+  const pinchDist = Math.hypot(thumbTip.x - idxTip.x, thumbTip.y - idxTip.y);
+  const isPinched = pinchDist < 0.05;
+  
+  const x = (1 - idxTip.x - 0.5) * 80;
+  const y = (0.5 - idxTip.y) * 60;
+  const z = idxTip.z * -50;
+  
+  // Count fingers to determine mode
+  let fingers = 0;
+  if(landmarks[8].y < landmarks[6].y) fingers++;
+  if(landmarks[12].y < landmarks[10].y) fingers++;
+  if(landmarks[16].y < landmarks[14].y) fingers++;
+  if(landmarks[20].y < landmarks[18].y) fingers++;
+  
+  const currentMode = [0,1,2,3][Math.min(fingers-1, 3)] || 0;
+  
+  if(idxExtended && !isPinched){
+    const now = performance.now() / 1000;
+    const emitKey = 'lastEmitTime' + handNum;
+    if(now - window[emitKey] > 0.02){
+      const dx = x - prevPos.x;
+      const dy = y - prevPos.y;
+      const dz = z - prevPos.z;
+      const speed = Math.hypot(dx, dy);
+      const depthScale = THREE.MathUtils.mapLinear(idxTip.z, -0.3, 0.3, 1.5, 0.6);
+      
+      // Use hand's own hue offset
+      const handHue = (handNum === 1) ? hue : (hue + 0.5) % 1;
+      
+      const emitCount = Math.floor(1 + speed * 6);
+      for(let i=0; i<emitCount; i++){
+        const lerp = i / emitCount;
+        const px = prevPos.x + dx * lerp;
+        const py = prevPos.y + dy * lerp;
+        const pz = prevPos.z + dz * lerp;
+        
+        switch(currentMode){
+          case 0: emitFireworks(px, py, pz, dx, dy, dz, depthScale, handHue); break;
+          case 1: emitHeart(px, py, pz, dx, dy, dz, depthScale, handHue); break;
+          case 2: emitRing(px, py, pz, dx, dy, dz, depthScale, handHue); break;
+          case 3: emitFlower(px, py, pz, dx, dy, dz, depthScale, handHue); break;
+        }
+      }
+      
+      window[emitKey] = now;
+    }
+    return { pos: new THREE.Vector3(x, y, z), mode: currentMode };
+  }
+  return { pos: prevPos, mode: currentMode };
+}
+
+hands.onResults(results => {
+  document.getElementById('loading').style.display = 'none';
+  
+  const handsDetected = results.multiHandLandmarks?.length || 0;
+  
+  if(handsDetected === 0){
+    return;
+  }
+  
+  // Process first hand
+  const result1 = processHand(results.multiHandLandmarks[0], prevPos1, null, 1, mode1);
+  prevPos1.copy(result1.pos);
+  mode1 = result1.mode;
+  
+  // Update hue from first hand
+  hue = (1 - results.multiHandLandmarks[0][0].x);
+  
+  // Process second hand if present
+  if(results.multiHandLandmarks[1]){
+    const result2 = processHand(results.multiHandLandmarks[1], prevPos2, null, 2, mode2);
+    prevPos2.copy(result2.pos);
+    mode2 = result2.mode;
+  }
+  
+  // Update mode indicator
+  const names = ['🎆', '💖', '🪐', '🌸'];
+  const colors = ['#00ffff', '#ff69b4', '#ffd700', '#ffb6c1'];
+  const ind = document.getElementById('modeIndicator');
+  
+  if(results.multiHandLandmarks[1]){
+    ind.textContent = names[mode1] + ' + ' + names[mode2];
+    ind.style.background = 'linear-gradient(45deg, ' + colors[mode1] + ', ' + colors[mode2] + ')';
+    ind.style.color = '#fff';
+  } else {
+    ind.textContent = names[mode1] + ' ' + ['Fireworks','Heart','Ring','Flower'][mode1];
+    ind.style.color = colors[mode1];
+    ind.style.background = 'rgba(0,0,0,0.6)';
+  }
+});
+
+function onCameraReady(){
+  document.getElementById('loading').style.display = 'none';
+  hands.send({image: video});
+}
+
+const cam = new Camera(video, {
+  onFrame: async () => {
+    await hands.send({image: video});
+  },
+  width: 640,
+  height: 480
+});
+
+cam.start().then(() => {
+  document.getElementById('loading').style.display = 'none';
+}).catch(err => {
+  document.getElementById('loading').textContent = 'Camera error: ' + err.message;
+});
+</script>
+</body>
+</html>
