@@ -823,35 +823,66 @@ function emitFlower(x, y, z, dx, dy, dz, depthScale, hue){
 
 // =============== NEW PHASE 2 PARTICLE MODES ===============
 
-// Nebula - Cloud-like formations with depth
+// Nebula - Cloud-like formations with depth and glow
 function emitNebula(x, y, z, dx, dy, dz, depthScale, hue){
-  const count = 8 + Math.floor(Math.random() * 12);
-  const nebulaHue = 0.6 + Math.random() * 0.3; // Blue-purple range
+  // More particles for denser cloud effect
+  const count = 15 + Math.floor(Math.random() * 20);
   
-  for(let i=0; i<count; i++){
-    // Spherical distribution with varying density
+  // Nebula colors: deep blues, purples, pinks, and occasional bright stars
+  const colorPalettes = [
+    { h: 0.6, s: 0.8, l: 0.3 },  // Deep blue
+    { h: 0.75, s: 0.7, l: 0.35 }, // Purple
+    { h: 0.85, s: 0.6, l: 0.4 },  // Pink
+    { h: 0.55, s: 0.9, l: 0.25 }, // Cyan-blue
+  ];
+  
+  // Core glow - bright center
+  const coreColor = new THREE.Color().setHSL(0.6, 0.5, 0.7);
+  emitParticle(x, y, z, dx * 0.1, dy * 0.1, dz * 0.1, 0.6, 1.5 * depthScale, coreColor);
+  
+  for(let i = 0; i < count; i++){
+    // Gaussian-like distribution for more natural cloud shape
     const theta = Math.random() * Math.PI * 2;
     const phi = Math.acos(2 * Math.random() - 1);
-    const radius = 0.5 + Math.random() * 1.5;
+    // Use exponential distribution for radius (more particles near center)
+    const radius = 0.3 + Math.pow(Math.random(), 2) * 2.5;
     
     const nx = Math.sin(phi) * Math.cos(theta) * radius;
     const ny = Math.sin(phi) * Math.sin(theta) * radius;
-    const nz = Math.cos(phi) * radius;
+    const nz = Math.cos(phi) * radius * 0.6; // Flatten slightly
     
-    // Soft, cloudy colors
+    // Pick a random color from palette
+    const palette = colorPalettes[Math.floor(Math.random() * colorPalettes.length)];
     const color = new THREE.Color().setHSL(
-      nebulaHue + Math.random() * 0.1,
-      0.6 + Math.random() * 0.3,
-      0.4 + Math.random() * 0.3
+      palette.h + (Math.random() - 0.5) * 0.1,
+      palette.s + Math.random() * 0.2,
+      palette.l + Math.random() * 0.3
     );
+    
+    // Slow, drifting velocity
+    const drift = 0.15;
     
     emitParticle(
       x + nx, y + ny, z + nz,
-      nx * 0.2 + (Math.random()-0.5) * 0.3,
-      ny * 0.2 + (Math.random()-0.5) * 0.3,
-      nz * 0.15,
-      nebulaHue, 0.6 + depthScale * 0.3, color
+      nx * 0.08 + (Math.random() - 0.5) * drift,
+      ny * 0.08 + (Math.random() - 0.5) * drift,
+      nz * 0.05 + (Math.random() - 0.5) * drift * 0.5,
+      palette.h, (0.4 + Math.random() * 0.4) * depthScale, color
     );
+  }
+  
+  // Add some bright "stars" within the nebula
+  const starCount = 2 + Math.floor(Math.random() * 3);
+  for(let i = 0; i < starCount; i++){
+    const starColor = new THREE.Color().setHSL(
+      0.1 + Math.random() * 0.1, // Yellowish
+      0.2,
+      0.8 + Math.random() * 0.2
+    );
+    const sx = x + (Math.random() - 0.5) * 2;
+    const sy = y + (Math.random() - 0.5) * 2;
+    const sz = z + (Math.random() - 0.5) * 1;
+    emitParticle(sx, sy, sz, 0, 0, 0, 0.1, 0.8, starColor);
   }
 }
 
@@ -1215,10 +1246,12 @@ function processHand(landmarks, prevPos, lastEmitTime, handNum, handMode, trailH
   if(landmarks[16].y < landmarks[14].y) fingers++;    // Ring
   if(landmarks[20].y < landmarks[18].y) fingers++;    // Pinky
   
-  // Check thumb extension
-  const thumbExtended = landmarks[4].x < landmarks[3].x - 0.02 || landmarks[4].x > landmarks[3].x + 0.02;
+  // Check thumb extension (more reliable detection)
+  const thumbMCP = landmarks[2];
+  // Thumb is extended if tip is away from palm (comparing x for left/right hand)
+  const thumbExtended = Math.abs(thumbTip.x - thumbMCP.x) > 0.06;
   
-  // Mode mapping:
+  // Mode mapping with stability:
   // 1 finger (index) = mode 0 (Fireworks)
   // 2 fingers (peace) = mode 1 (Heart)
   // 3 fingers = mode 2 (Ring)
@@ -1227,20 +1260,40 @@ function processHand(landmarks, prevPos, lastEmitTime, handNum, handMode, trailH
   // Thumbs up (thumb only, no fingers) = mode 5 (Galaxy)
   // Use keyboard '7' for mode 6 (Plasma)
   
-  let currentMode;
+  let targetMode;
   if (thumbExtended && fingers === 0) {
     // Thumbs up = Galaxy mode
-    currentMode = 5;
+    targetMode = 5;
   } else if (thumbExtended && fingers === 4) {
     // Open palm = Nebula mode
-    currentMode = 4;
+    targetMode = 4;
   } else if (fingers > 0) {
     // 1-4 fingers = modes 0-3
-    currentMode = fingers - 1;
+    targetMode = fingers - 1;
   } else {
-    // No fingers, no thumb = keep previous mode (default to 0)
-    currentMode = 0;
+    // No clear gesture - don't change mode
+    targetMode = window['lastStableMode' + handNum] || 0;
   }
+  
+  // Mode stability: require same gesture for 3 frames before switching
+  const modeHistoryKey = 'modeHistory' + handNum;
+  if (!window[modeHistoryKey]) window[modeHistoryKey] = [];
+  window[modeHistoryKey].push(targetMode);
+  if (window[modeHistoryKey].length > 5) window[modeHistoryKey].shift();
+  
+  // Find most common mode in history
+  const modeCounts = {};
+  window[modeHistoryKey].forEach(m => modeCounts[m] = (modeCounts[m] || 0) + 1);
+  let maxCount = 0;
+  let currentMode = targetMode;
+  for (const [mode, count] of Object.entries(modeCounts)) {
+    if (count > maxCount) {
+      maxCount = count;
+      currentMode = parseInt(mode);
+    }
+  }
+  
+  window['lastStableMode' + handNum] = currentMode;
   currentMode = Math.min(currentMode, 6);
   
   if(idxExtended && !isPinched){
@@ -1738,7 +1791,6 @@ const musicVolumeValue = document.getElementById('musicVolumeValue');
 
 let audioContext = null;
 let ambientNodes = null;
-let oscillatorsStarted = false;
 
 function createAmbientMusic() {
   if (audioContext) return; // Already created
@@ -1747,29 +1799,43 @@ function createAmbientMusic() {
   
   // Create master gain - start at 0 (muted)
   const masterGain = audioContext.createGain();
-  masterGain.gain.value = 0; // Start muted
+  masterGain.gain.value = 0;
   masterGain.connect(audioContext.destination);
   
-  // Create multiple oscillators for ambient pad
-  const oscillators = [];
-  const baseFreqs = [110, 165, 220, 330, 440]; // A2, E3, A3, E4, A4
+  // Create a reverb-like effect using convolver simulation
+  const reverbGain = audioContext.createGain();
+  reverbGain.gain.value = 0.3;
   
-  baseFreqs.forEach((freq, i) => {
+  // Create ambient pad with soft sine waves
+  const oscillators = [];
+  // Peaceful chord: Am7 (A, C, E, G) in different octaves
+  const notes = [
+    { freq: 110, type: 'sine' },    // A2
+    { freq: 130.81, type: 'sine' }, // C3
+    { freq: 164.81, type: 'sine' }, // E3
+    { freq: 196, type: 'sine' },    // G3
+    { freq: 220, type: 'sine' },    // A3
+    { freq: 261.63, type: 'triangle' }, // C4 (softer)
+    { freq: 329.63, type: 'sine' }, // E4
+  ];
+  
+  notes.forEach((note, i) => {
     const osc = audioContext.createOscillator();
-    osc.type = 'sine';
-    osc.frequency.value = freq;
+    osc.type = note.type;
+    osc.frequency.value = note.freq;
     
-    // Add slight detune for richness
-    osc.detune.value = Math.random() * 10 - 5;
+    // Very slight detune for warmth
+    osc.detune.value = (Math.random() - 0.5) * 4;
     
+    // Individual gain for each oscillator
     const gain = audioContext.createGain();
-    gain.gain.value = 0.1 / (i + 1); // Lower volume for higher frequencies
+    gain.gain.value = 0.08 / (1 + i * 0.3);
     
-    // Add filter for warmth
+    // Soft lowpass filter
     const filter = audioContext.createBiquadFilter();
     filter.type = 'lowpass';
-    filter.frequency.value = 800 + Math.random() * 400;
-    filter.Q.value = 1;
+    filter.frequency.value = 600;
+    filter.Q.value = 0.5;
     
     osc.connect(filter);
     filter.connect(gain);
@@ -1778,27 +1844,25 @@ function createAmbientMusic() {
     oscillators.push({ osc, gain, filter });
   });
   
-  // Create LFO for subtle movement
+  // Very subtle LFO for filter movement (creates shimmer)
   const lfo = audioContext.createOscillator();
   lfo.type = 'sine';
-  lfo.frequency.value = 0.1; // Very slow modulation
+  lfo.frequency.value = 0.05; // Very slow
   
   const lfoGain = audioContext.createGain();
-  lfoGain.gain.value = 2;
+  lfoGain.gain.value = 50; // Subtle movement
   
   lfo.connect(lfoGain);
-  oscillators.forEach(o => {
-    lfoGain.connect(o.filter.frequency);
-  });
+  // Only modulate first filter for subtle effect
+  if (oscillators.length > 0) {
+    lfoGain.connect(oscillators[0].filter.frequency);
+  }
   
   ambientNodes = { oscillators, lfo, masterGain };
   
   // Start oscillators immediately (they're muted by masterGain)
-  oscillators.forEach(o => {
-    o.osc.start();
-  });
+  oscillators.forEach(o => o.osc.start());
   lfo.start();
-  oscillatorsStarted = true;
 }
 
 async function startAmbientMusic() {
@@ -1810,7 +1874,6 @@ async function startAmbientMusic() {
   if (audioContext.state === 'suspended') {
     try {
       await audioContext.resume();
-      console.log('AudioContext resumed successfully');
     } catch (e) {
       console.error('Failed to resume AudioContext:', e);
       return;
