@@ -104,6 +104,39 @@
       transform:scale(1.1);
     }
     
+    /* Record Button */
+    #recordBtn {
+      position:absolute;
+      bottom:20px;
+      left:80px;
+      width:50px;
+      height:50px;
+      border-radius:50%;
+      background:rgba(0,0,0,0.6);
+      border:2px solid #ff4444;
+      color:#ff4444;
+      font-size:20px;
+      cursor:pointer;
+      z-index:50;
+      transition:all 0.3s;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    #recordBtn:hover {
+      background:rgba(255,68,68,0.2);
+      box-shadow:0 0 20px rgba(255,68,68,0.5);
+      transform:scale(1.1);
+    }
+    #recordBtn.recording {
+      background:rgba(255,68,68,0.4);
+      animation:pulse 1s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { box-shadow:0 0 10px rgba(255,68,68,0.5); }
+      50% { box-shadow:0 0 25px rgba(255,68,68,0.8); }
+    }
+    
     /* Settings Panel */
     #settingsPanel {
       position:absolute;
@@ -244,7 +277,8 @@
   <h1>3D Particle Sketchpad HD</h1>
   <p>Point with index finger to draw<br>
      Pinch thumb+index to lift<br>
-     Show 1-4 fingers for different modes<br>
+     Show 1-5 fingers for different modes<br>
+     Press 1-7 keys for all modes<br>
      Wave left/right to change colors</p>
 </div>
 
@@ -253,6 +287,7 @@
 <video id="video" autoplay playsinline muted></video>
 
 <button id="settingsBtn" title="Settings (S)">⚙️</button>
+<button id="recordBtn" title="Record (R)">⏺</button>
 
 <div id="settingsPanel">
   <div class="settings-header">
@@ -303,11 +338,29 @@
     </label>
   </div>
   
+  <div class="settings-group">
+    <label>
+      <input type="checkbox" id="ambientMusicToggle"> Ambient Music
+    </label>
+    <div style="margin-top:8px;">
+      <label>Volume: <span id="musicVolumeValue">30</span>%</label>
+      <input type="range" id="musicVolumeSlider" min="0" max="100" step="5" value="30" style="width:100%;">
+    </div>
+  </div>
+  
+  <div class="settings-group">
+    <label>Presets</label>
+    <div style="display:flex; gap:8px; margin-top:5px;">
+      <button id="savePresetBtn" style="flex:1; padding:8px; background:rgba(0,255,255,0.2); border:1px solid #0ff; border-radius:6px; color:#0ff; cursor:pointer;">Save</button>
+      <button id="loadPresetBtn" style="flex:1; padding:8px; background:rgba(0,255,255,0.2); border:1px solid #0ff; border-radius:6px; color:#0ff; cursor:pointer;">Load</button>
+    </div>
+  </div>
+  
   <button id="resetSettings">Reset to Defaults</button>
   
   <div class="shortcuts-hint">
     <kbd>S</kbd> Settings &nbsp; <kbd>B</kbd> Bloom &nbsp; <kbd>T</kbd> Theme<br>
-    <kbd>1-4</kbd> Modes &nbsp; <kbd>Space</kbd> Clear &nbsp; <kbd>M</kbd> Hand Map
+    <kbd>1-7</kbd> Modes &nbsp; <kbd>R</kbd> Record &nbsp; <kbd>M</kbd> Hand Map
   </div>
 </div>
 
@@ -768,6 +821,121 @@ function emitFlower(x, y, z, dx, dy, dz, depthScale, hue){
   }
 }
 
+// =============== NEW PHASE 2 PARTICLE MODES ===============
+
+// Nebula - Cloud-like formations with depth
+function emitNebula(x, y, z, dx, dy, dz, depthScale, hue){
+  const count = 8 + Math.floor(Math.random() * 12);
+  const nebulaHue = 0.6 + Math.random() * 0.3; // Blue-purple range
+  
+  for(let i=0; i<count; i++){
+    // Spherical distribution with varying density
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2 * Math.random() - 1);
+    const radius = 0.5 + Math.random() * 1.5;
+    
+    const nx = Math.sin(phi) * Math.cos(theta) * radius;
+    const ny = Math.sin(phi) * Math.sin(theta) * radius;
+    const nz = Math.cos(phi) * radius;
+    
+    // Soft, cloudy colors
+    const color = new THREE.Color().setHSL(
+      nebulaHue + Math.random() * 0.1,
+      0.6 + Math.random() * 0.3,
+      0.4 + Math.random() * 0.3
+    );
+    
+    emitParticle(
+      x + nx, y + ny, z + nz,
+      nx * 0.2 + (Math.random()-0.5) * 0.3,
+      ny * 0.2 + (Math.random()-0.5) * 0.3,
+      nz * 0.15,
+      nebulaHue, 0.6 + depthScale * 0.3, color
+    );
+  }
+}
+
+// Galaxy - Spiral arm formation
+function emitGalaxy(x, y, z, dx, dy, dz, depthScale, hue){
+  const arms = 2; // Number of spiral arms
+  const particlesPerArm = 6;
+  
+  // Core glow
+  const coreColor = new THREE.Color().setHSL(0.15, 0.9, 0.7);
+  emitParticle(x, y, z, 0, 0, 0, 0.15, 1.2, coreColor);
+  
+  for(let arm = 0; arm < arms; arm++){
+    const armOffset = (arm / arms) * Math.PI * 2;
+    
+    for(let i = 0; i < particlesPerArm; i++){
+      // Logarithmic spiral
+      const t = i / particlesPerArm;
+      const angle = armOffset + t * Math.PI * 3;
+      const radius = 0.3 + t * 2;
+      
+      // Add some spread to the arm
+      const spread = 0.2 + t * 0.3;
+      const sx = Math.cos(angle) * radius + (Math.random()-0.5) * spread;
+      const sy = Math.sin(angle) * radius * 0.4 + (Math.random()-0.5) * spread; // Flattened
+      const sz = (Math.random()-0.5) * spread * 0.5;
+      
+      // Color gradient from center (yellow/white) to edge (blue/purple)
+      const starHue = 0.6 + t * 0.2;
+      const color = new THREE.Color().setHSL(starHue, 0.7 - t * 0.3, 0.6 + t * 0.2);
+      
+      // Orbital velocity
+      const orbitSpeed = 0.3 * (1 - t * 0.5);
+      emitParticle(
+        x + sx, y + sy, z + sz,
+        -Math.sin(angle) * orbitSpeed,
+        Math.cos(angle) * orbitSpeed * 0.3,
+        (Math.random()-0.5) * 0.1,
+        starHue, 0.5 + (1-t) * 0.5, color
+      );
+    }
+  }
+}
+
+// Plasma - Energy ball with electric arcs
+function emitPlasma(x, y, z, dx, dy, dz, depthScale, hue){
+  const count = 10 + Math.floor(Math.random() * 8);
+  
+  // Core energy
+  const coreColor = new THREE.Color().setHSL(0.5, 1, 0.8);
+  emitParticle(x, y, z, 0, 0, 0, 0.5, 1.0, coreColor);
+  
+  for(let i=0; i<count; i++){
+    // Electric arc effect - random directions from center
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2 * Math.random() - 1);
+    const length = 0.5 + Math.random() * 1.5;
+    
+    // Jagged path simulation
+    const segments = 3;
+    for(let s = 0; s < segments; s++){
+      const segLen = length / segments;
+      const jitter = 0.2 * (s > 0 ? 1 : 0);
+      
+      const px = Math.sin(phi) * Math.cos(theta) * segLen * (s + 0.5) + (Math.random()-0.5) * jitter;
+      const py = Math.sin(phi) * Math.sin(theta) * segLen * (s + 0.5) + (Math.random()-0.5) * jitter;
+      const pz = Math.cos(phi) * segLen * (s + 0.5) + (Math.random()-0.5) * jitter;
+      
+      // Electric blue/purple/white colors
+      const plasmaHue = 0.55 + Math.random() * 0.15;
+      const brightness = 0.6 + Math.random() * 0.4;
+      const color = new THREE.Color().setHSL(plasmaHue, 0.8, brightness);
+      
+      emitParticle(
+        x + px, y + py, z + pz,
+        Math.sin(phi) * Math.cos(theta) * 0.8,
+        Math.sin(phi) * Math.sin(theta) * 0.8,
+        Math.cos(phi) * 0.6,
+        plasmaHue, 0.4 + depthScale * 0.3, color
+      );
+    }
+  }
+}
+
 // =============== ANIMATION LOOP ===============
 const clock = new THREE.Clock();
 const prevPos1 = new THREE.Vector3();
@@ -908,8 +1076,111 @@ function predictPosition(posBuffer, velBuffer, currentPos) {
   };
 }
 
+// =============== GESTURE RECOGNITION ===============
+function detectGesture(landmarks) {
+  if (!landmarks) return null;
+  
+  // Finger extension states
+  const thumbExtended = landmarks[4].x < landmarks[3].x - 0.02 || landmarks[4].x > landmarks[3].x + 0.02;
+  const indexExtended = landmarks[8].y < landmarks[6].y - 0.02;
+  const middleExtended = landmarks[12].y < landmarks[10].y - 0.02;
+  const ringExtended = landmarks[16].y < landmarks[14].y - 0.02;
+  const pinkyExtended = landmarks[20].y < landmarks[18].y - 0.02;
+  
+  // Peace sign: index and middle extended, others closed
+  if (indexExtended && middleExtended && !ringExtended && !pinkyExtended) {
+    return 'peace';
+  }
+  
+  // Thumbs up: only thumb extended, hand orientation check
+  if (thumbExtended && !indexExtended && !middleExtended && !ringExtended && !pinkyExtended) {
+    // Check if thumb is pointing up (thumb tip above thumb base)
+    if (landmarks[4].y < landmarks[2].y) {
+      return 'thumbsUp';
+    }
+  }
+  
+  // Open palm: all fingers extended
+  if (indexExtended && middleExtended && ringExtended && pinkyExtended) {
+    return 'openPalm';
+  }
+  
+  // Fist: all fingers closed
+  if (!indexExtended && !middleExtended && !ringExtended && !pinkyExtended && !thumbExtended) {
+    return 'fist';
+  }
+  
+  // Pointing: only index extended
+  if (indexExtended && !middleExtended && !ringExtended && !pinkyExtended) {
+    return 'pointing';
+  }
+  
+  // Rock: index and pinky extended
+  if (indexExtended && !middleExtended && !ringExtended && pinkyExtended) {
+    return 'rock';
+  }
+  
+  return null;
+}
+
+// Gesture action handlers
+let lastGestureTime = 0;
+function handleGesture(gesture) {
+  const now = Date.now();
+  if (now - lastGestureTime < 500) return; // Debounce 500ms
+  lastGestureTime = now;
+  
+  switch (gesture) {
+    case 'peace':
+      // Cycle bloom intensity
+      const bloomValues = [0, 1.5, 3.0];
+      const currentIndex = bloomValues.indexOf(settings.bloomStrength);
+      settings.bloomStrength = bloomValues[(currentIndex + 1) % bloomValues.length];
+      bloomPass.strength = settings.bloomStrength;
+      document.getElementById('bloomSlider').value = settings.bloomStrength;
+      document.getElementById('bloomValue').textContent = settings.bloomStrength.toFixed(1);
+      break;
+      
+    case 'thumbsUp':
+      // Save preset
+      document.getElementById('savePresetBtn').click();
+      break;
+      
+    case 'openPalm':
+      // Clear all particles
+      for (let i = 0; i < MAX_PARTICLES; i++) {
+        lifetimes[i] = -1;
+        positions[i * 3 + 1] = -999;
+      }
+      trailHistory1.length = 0;
+      trailHistory2.length = 0;
+      break;
+      
+    case 'fist':
+      // Toggle hand visualization
+      settings.showHandMap = !settings.showHandMap;
+      document.getElementById('handMapToggle').checked = settings.showHandMap;
+      handVisuals.forEach(hv => hv.group.visible = settings.showHandMap);
+      break;
+      
+    case 'rock':
+      // Cycle themes
+      const themes = ['rainbow', 'fire', 'ocean', 'neon', 'nature', 'sunset'];
+      const themeIndex = themes.indexOf(settings.colorTheme);
+      settings.colorTheme = themes[(themeIndex + 1) % themes.length];
+      document.getElementById('themeSelect').value = settings.colorTheme;
+      break;
+  }
+}
+
 function processHand(landmarks, prevPos, lastEmitTime, handNum, handMode, trailHistory, posBuffer, velBuffer){
   if(!landmarks) return { pos: prevPos, mode: handMode };
+  
+  // Detect and handle gestures
+  const gesture = detectGesture(landmarks);
+  if (gesture) {
+    handleGesture(gesture);
+  }
   
   const idxTip = landmarks[8];
   const idxPip = landmarks[6];
@@ -937,14 +1208,20 @@ function processHand(landmarks, prevPos, lastEmitTime, handNum, handMode, trailH
     updateTrail(trailHistory, x, y, z);
   }
   
-  // Count fingers to determine mode
+  // Count fingers to determine mode (now supports 7 modes)
   let fingers = 0;
-  if(landmarks[8].y < landmarks[6].y) fingers++;
-  if(landmarks[12].y < landmarks[10].y) fingers++;
-  if(landmarks[16].y < landmarks[14].y) fingers++;
-  if(landmarks[20].y < landmarks[18].y) fingers++;
+  if(landmarks[8].y < landmarks[6].y) fingers++;      // Index
+  if(landmarks[12].y < landmarks[10].y) fingers++;    // Middle
+  if(landmarks[16].y < landmarks[14].y) fingers++;    // Ring
+  if(landmarks[20].y < landmarks[18].y) fingers++;    // Pinky
   
-  const currentMode = [0,1,2,3][Math.min(fingers-1, 3)] || 0;
+  // Check thumb for additional mode
+  const thumbExtended = landmarks[4].x < landmarks[3].x - 0.02 || landmarks[4].x > landmarks[3].x + 0.02;
+  if(thumbExtended && fingers > 0) fingers = 5; // Thumb + any fingers = mode 5 (Galaxy)
+  
+  // Open palm (all 5 fingers) = mode 4 (Nebula)
+  // Use keyboard for modes 6 (Plasma) - press 7
+  const currentMode = Math.min(fingers > 0 ? fingers - 1 : 0, 6);
   
   if(idxExtended && !isPinched){
     const now = performance.now() / 1000;
@@ -971,6 +1248,9 @@ function processHand(landmarks, prevPos, lastEmitTime, handNum, handMode, trailH
           case 1: emitHeart(px, py, pz, dx, dy, dz, depthScale, handHue); break;
           case 2: emitRing(px, py, pz, dx, dy, dz, depthScale, handHue); break;
           case 3: emitFlower(px, py, pz, dx, dy, dz, depthScale, handHue); break;
+          case 4: emitNebula(px, py, pz, dx, dy, dz, depthScale, handHue); break;
+          case 5: emitGalaxy(px, py, pz, dx, dy, dz, depthScale, handHue); break;
+          case 6: emitPlasma(px, py, pz, dx, dy, dz, depthScale, handHue); break;
         }
       }
       
@@ -1027,9 +1307,10 @@ hands.onResults(results => {
     mode2 = result2.mode;
   }
   
-  // Update mode indicator
-  const names = ['🎆', '💖', '🪐', '🌸'];
-  const colorsArr = ['#00ffff', '#ff69b4', '#ffd700', '#ffb6c1'];
+  // Update mode indicator (7 modes now)
+  const names = ['🎆', '💖', '🪐', '🌸', '🌌', '🌀', '⚡'];
+  const modeNames = ['Fireworks', 'Heart', 'Ring', 'Flower', 'Nebula', 'Galaxy', 'Plasma'];
+  const colorsArr = ['#00ffff', '#ff69b4', '#ffd700', '#ffb6c1', '#9370db', '#4169e1', '#00bfff'];
   const ind = document.getElementById('modeIndicator');
   
   if(results.multiHandLandmarks[1]){
@@ -1037,7 +1318,7 @@ hands.onResults(results => {
     ind.style.background = 'linear-gradient(45deg, ' + colorsArr[mode1] + ', ' + colorsArr[mode2] + ')';
     ind.style.color = '#fff';
   } else {
-    ind.textContent = names[mode1] + ' ' + ['Fireworks','Heart','Ring','Flower'][mode1];
+    ind.textContent = names[mode1] + ' ' + modeNames[mode1];
     ind.style.color = colorsArr[mode1];
     ind.style.background = 'rgba(0,0,0,0.6)';
   }
@@ -1190,10 +1471,11 @@ document.addEventListener('keydown', (e) => {
       break;
       
     case 'r':
-      resetSettings.click();
+      // Toggle recording
+      recordBtn.click();
       break;
       
-    case '1': case '2': case '3': case '4':
+    case '1': case '2': case '3': case '4': case '5': case '6': case '7':
       mode1 = parseInt(e.key) - 1;
       break;
       
@@ -1234,6 +1516,304 @@ document.addEventListener('click', (e) => {
       e.target !== settingsBtn) {
     settingsPanel.classList.remove('active');
   }
+});
+
+// =============== SCREEN RECORDING ===============
+const recordBtn = document.getElementById('recordBtn');
+let mediaRecorder = null;
+let recordedChunks = [];
+let isRecording = false;
+
+function startRecording() {
+  recordedChunks = [];
+  
+  // Capture the canvas at 60fps
+  const canvasStream = renderer.domElement.captureStream(60);
+  
+  // Try to get audio if available
+  const options = { mimeType: 'video/webm;codecs=vp9' };
+  
+  try {
+    mediaRecorder = new MediaRecorder(canvasStream, options);
+  } catch (e) {
+    // Fallback to default codec
+    mediaRecorder = new MediaRecorder(canvasStream);
+  }
+  
+  mediaRecorder.ondataavailable = (e) => {
+    if (e.data.size > 0) {
+      recordedChunks.push(e.data);
+    }
+  };
+  
+  mediaRecorder.onstop = () => {
+    // Create download link
+    const blob = new Blob(recordedChunks, { type: 'video/webm' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `particle-drawing-${Date.now()}.webm`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    // Reset button
+    recordBtn.textContent = '⏺';
+    recordBtn.classList.remove('recording');
+    recordBtn.title = 'Record (R)';
+    isRecording = false;
+  };
+  
+  mediaRecorder.start(100); // Collect data every 100ms
+  isRecording = true;
+  recordBtn.textContent = '⏹';
+  recordBtn.classList.add('recording');
+  recordBtn.title = 'Stop Recording (R)';
+}
+
+function stopRecording() {
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    mediaRecorder.stop();
+  }
+}
+
+recordBtn.addEventListener('click', () => {
+  if (isRecording) {
+    stopRecording();
+  } else {
+    startRecording();
+  }
+});
+
+// =============== PRESET SAVE/LOAD SYSTEM ===============
+const savePresetBtn = document.getElementById('savePresetBtn');
+const loadPresetBtn = document.getElementById('loadPresetBtn');
+
+function savePreset() {
+  const preset = {
+    settings: { ...settings },
+    timestamp: Date.now(),
+    version: '2.0'
+  };
+  
+  // Save to localStorage
+  localStorage.setItem('particleDrawingPreset', JSON.stringify(preset));
+  
+  // Also offer download
+  const blob = new Blob([JSON.stringify(preset, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `particle-preset-${Date.now()}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  
+  // Visual feedback
+  savePresetBtn.textContent = 'Saved!';
+  savePresetBtn.style.background = 'rgba(0,255,0,0.3)';
+  setTimeout(() => {
+    savePresetBtn.textContent = 'Save';
+    savePresetBtn.style.background = 'rgba(0,255,255,0.2)';
+  }, 1500);
+}
+
+function loadPreset() {
+  // Try localStorage first
+  const saved = localStorage.getItem('particleDrawingPreset');
+  
+  if (saved) {
+    try {
+      const preset = JSON.parse(saved);
+      applyPreset(preset);
+      loadPresetBtn.textContent = 'Loaded!';
+      loadPresetBtn.style.background = 'rgba(0,255,0,0.3)';
+      setTimeout(() => {
+        loadPresetBtn.textContent = 'Load';
+        loadPresetBtn.style.background = 'rgba(0,255,255,0.2)';
+      }, 1500);
+      return;
+    } catch (e) {
+      console.error('Failed to load preset from localStorage:', e);
+    }
+  }
+  
+  // If no saved preset, offer file upload
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json';
+  input.onchange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const preset = JSON.parse(event.target.result);
+          applyPreset(preset);
+          loadPresetBtn.textContent = 'Loaded!';
+          loadPresetBtn.style.background = 'rgba(0,255,0,0.3)';
+          setTimeout(() => {
+            loadPresetBtn.textContent = 'Load';
+            loadPresetBtn.style.background = 'rgba(0,255,255,0.2)';
+          }, 1500);
+        } catch (err) {
+          alert('Invalid preset file');
+        }
+      };
+      reader.readAsText(file);
+    }
+  };
+  input.click();
+}
+
+function applyPreset(preset) {
+  if (!preset.settings) return;
+  
+  // Apply settings
+  Object.assign(settings, preset.settings);
+  
+  // Update UI
+  bloomSlider.value = settings.bloomStrength;
+  bloomValue.textContent = settings.bloomStrength.toFixed(1);
+  bloomRadiusSlider.value = settings.bloomRadius;
+  bloomRadiusValue.textContent = settings.bloomRadius.toFixed(1);
+  smoothingSlider.value = settings.smoothingFactor;
+  smoothingValue.textContent = settings.smoothingFactor.toFixed(2);
+  trailSlider.value = settings.trailLength;
+  trailValue.textContent = settings.trailLength;
+  sizeSlider.value = settings.particleSize;
+  sizeValue.textContent = settings.particleSize.toFixed(1);
+  themeSelect.value = settings.colorTheme;
+  handMapToggle.checked = settings.showHandMap;
+  
+  // Apply to renderers
+  bloomPass.strength = settings.bloomStrength;
+  bloomPass.radius = settings.bloomRadius;
+  particleMat.size = settings.particleSize;
+  handVisuals.forEach(hv => hv.group.visible = settings.showHandMap);
+}
+
+// Load preset on startup if available
+window.addEventListener('load', () => {
+  const saved = localStorage.getItem('particleDrawingPreset');
+  if (saved) {
+    try {
+      const preset = JSON.parse(saved);
+      applyPreset(preset);
+    } catch (e) {
+      // Ignore errors on load
+    }
+  }
+});
+
+savePresetBtn.addEventListener('click', savePreset);
+loadPresetBtn.addEventListener('click', loadPreset);
+
+// =============== AMBIENT MUSIC SYSTEM ===============
+const ambientMusicToggle = document.getElementById('ambientMusicToggle');
+const musicVolumeSlider = document.getElementById('musicVolumeSlider');
+const musicVolumeValue = document.getElementById('musicVolumeValue');
+
+let audioContext = null;
+let ambientNodes = null;
+
+function createAmbientMusic() {
+  if (audioContext) return; // Already created
+  
+  audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  
+  // Create master gain
+  const masterGain = audioContext.createGain();
+  masterGain.gain.value = 0.3;
+  masterGain.connect(audioContext.destination);
+  
+  // Create multiple oscillators for ambient pad
+  const oscillators = [];
+  const baseFreqs = [110, 165, 220, 330, 440]; // A2, E3, A3, E4, A4
+  
+  baseFreqs.forEach((freq, i) => {
+    const osc = audioContext.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    
+    // Add slight detune for richness
+    osc.detune.value = Math.random() * 10 - 5;
+    
+    const gain = audioContext.createGain();
+    gain.gain.value = 0.1 / (i + 1); // Lower volume for higher frequencies
+    
+    // Add filter for warmth
+    const filter = audioContext.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = 800 + Math.random() * 400;
+    filter.Q.value = 1;
+    
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(masterGain);
+    
+    oscillators.push({ osc, gain, filter });
+  });
+  
+  // Create LFO for subtle movement
+  const lfo = audioContext.createOscillator();
+  lfo.type = 'sine';
+  lfo.frequency.value = 0.1; // Very slow modulation
+  
+  const lfoGain = audioContext.createGain();
+  lfoGain.gain.value = 2;
+  
+  lfo.connect(lfoGain);
+  oscillators.forEach(o => {
+    lfoGain.connect(o.filter.frequency);
+  });
+  
+  ambientNodes = { oscillators, lfo, masterGain };
+}
+
+function startAmbientMusic() {
+  if (!audioContext) {
+    createAmbientMusic();
+  }
+  
+  if (audioContext.state === 'suspended') {
+    audioContext.resume();
+  }
+  
+  ambientNodes.oscillators.forEach(o => {
+    try { o.osc.start(); } catch(e) {} // Already started
+  });
+  try { ambientNodes.lfo.start(); } catch(e) {}
+  
+  ambientNodes.masterGain.gain.value = musicVolumeSlider.value / 100;
+}
+
+function stopAmbientMusic() {
+  if (ambientNodes) {
+    ambientNodes.masterGain.gain.value = 0;
+  }
+}
+
+function updateMusicVolume(value) {
+  if (ambientNodes) {
+    ambientNodes.masterGain.gain.value = value / 100;
+  }
+}
+
+ambientMusicToggle.addEventListener('change', (e) => {
+  if (e.target.checked) {
+    startAmbientMusic();
+  } else {
+    stopAmbientMusic();
+  }
+});
+
+musicVolumeSlider.addEventListener('input', (e) => {
+  const value = parseInt(e.target.value);
+  musicVolumeValue.textContent = value;
+  updateMusicVolume(value);
 });
 </script>
 </body>
