@@ -1215,13 +1215,33 @@ function processHand(landmarks, prevPos, lastEmitTime, handNum, handMode, trailH
   if(landmarks[16].y < landmarks[14].y) fingers++;    // Ring
   if(landmarks[20].y < landmarks[18].y) fingers++;    // Pinky
   
-  // Check thumb for additional mode
+  // Check thumb extension
   const thumbExtended = landmarks[4].x < landmarks[3].x - 0.02 || landmarks[4].x > landmarks[3].x + 0.02;
-  if(thumbExtended && fingers > 0) fingers = 5; // Thumb + any fingers = mode 5 (Galaxy)
   
-  // Open palm (all 5 fingers) = mode 4 (Nebula)
-  // Use keyboard for modes 6 (Plasma) - press 7
-  const currentMode = Math.min(fingers > 0 ? fingers - 1 : 0, 6);
+  // Mode mapping:
+  // 1 finger (index) = mode 0 (Fireworks)
+  // 2 fingers (peace) = mode 1 (Heart)
+  // 3 fingers = mode 2 (Ring)
+  // 4 fingers = mode 3 (Flower)
+  // Open palm (4 fingers + thumb) = mode 4 (Nebula)
+  // Thumbs up (thumb only, no fingers) = mode 5 (Galaxy)
+  // Use keyboard '7' for mode 6 (Plasma)
+  
+  let currentMode;
+  if (thumbExtended && fingers === 0) {
+    // Thumbs up = Galaxy mode
+    currentMode = 5;
+  } else if (thumbExtended && fingers === 4) {
+    // Open palm = Nebula mode
+    currentMode = 4;
+  } else if (fingers > 0) {
+    // 1-4 fingers = modes 0-3
+    currentMode = fingers - 1;
+  } else {
+    // No fingers, no thumb = keep previous mode (default to 0)
+    currentMode = 0;
+  }
+  currentMode = Math.min(currentMode, 6);
   
   if(idxExtended && !isPinched){
     const now = performance.now() / 1000;
@@ -1718,15 +1738,16 @@ const musicVolumeValue = document.getElementById('musicVolumeValue');
 
 let audioContext = null;
 let ambientNodes = null;
+let oscillatorsStarted = false;
 
 function createAmbientMusic() {
   if (audioContext) return; // Already created
   
   audioContext = new (window.AudioContext || window.webkitAudioContext)();
   
-  // Create master gain
+  // Create master gain - start at 0 (muted)
   const masterGain = audioContext.createGain();
-  masterGain.gain.value = 0.3;
+  masterGain.gain.value = 0; // Start muted
   masterGain.connect(audioContext.destination);
   
   // Create multiple oscillators for ambient pad
@@ -1771,34 +1792,47 @@ function createAmbientMusic() {
   });
   
   ambientNodes = { oscillators, lfo, masterGain };
+  
+  // Start oscillators immediately (they're muted by masterGain)
+  oscillators.forEach(o => {
+    o.osc.start();
+  });
+  lfo.start();
+  oscillatorsStarted = true;
 }
 
-function startAmbientMusic() {
+async function startAmbientMusic() {
   if (!audioContext) {
     createAmbientMusic();
   }
   
+  // Resume AudioContext if suspended (browser autoplay policy)
   if (audioContext.state === 'suspended') {
-    audioContext.resume();
+    try {
+      await audioContext.resume();
+      console.log('AudioContext resumed successfully');
+    } catch (e) {
+      console.error('Failed to resume AudioContext:', e);
+      return;
+    }
   }
   
-  ambientNodes.oscillators.forEach(o => {
-    try { o.osc.start(); } catch(e) {} // Already started
-  });
-  try { ambientNodes.lfo.start(); } catch(e) {}
-  
-  ambientNodes.masterGain.gain.value = musicVolumeSlider.value / 100;
+  // Fade in the music smoothly
+  const targetVolume = musicVolumeSlider.value / 100;
+  ambientNodes.masterGain.gain.setTargetAtTime(targetVolume, audioContext.currentTime, 0.5);
 }
 
 function stopAmbientMusic() {
-  if (ambientNodes) {
-    ambientNodes.masterGain.gain.value = 0;
+  if (ambientNodes && audioContext) {
+    // Fade out smoothly
+    ambientNodes.masterGain.gain.setTargetAtTime(0, audioContext.currentTime, 0.3);
   }
 }
 
 function updateMusicVolume(value) {
-  if (ambientNodes) {
-    ambientNodes.masterGain.gain.value = value / 100;
+  if (ambientNodes && audioContext && ambientMusicToggle.checked) {
+    // Smooth volume transition
+    ambientNodes.masterGain.gain.setTargetAtTime(value / 100, audioContext.currentTime, 0.1);
   }
 }
 
