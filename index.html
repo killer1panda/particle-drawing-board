@@ -824,47 +824,63 @@ function emitFlower(x, y, z, dx, dy, dz, depthScale, hue){
 
 // =============== NEW PHASE 2 PARTICLE MODES ===============
 
-// Nebula - Cloud-like formations with depth and glow
+// Nebula - Ethereal cloud-like formations with vibrant colors
 function emitNebula(x, y, z, dx, dy, dz, depthScale, hue){
-  // Reduced particle count to prevent overflow
-  const count = 5 + Math.floor(Math.random() * 8);
+  const count = 8 + Math.floor(Math.random() * 6);
   
-  // Nebula colors: deep blues, purples, pinks
+  // Vibrant nebula colors
   const colorPalettes = [
-    { h: 0.6, s: 0.8, l: 0.5 },  // Blue
-    { h: 0.75, s: 0.7, l: 0.5 }, // Purple
-    { h: 0.85, s: 0.6, l: 0.55 }, // Pink
-    { h: 0.55, s: 0.9, l: 0.45 }, // Cyan
+    { h: 0.65, s: 0.9, l: 0.6 },  // Bright blue
+    { h: 0.78, s: 0.85, l: 0.55 }, // Purple
+    { h: 0.92, s: 0.8, l: 0.6 },  // Magenta/Pink
+    { h: 0.55, s: 0.95, l: 0.5 }, // Cyan
+    { h: 0.08, s: 0.9, l: 0.6 },  // Orange accent
   ];
   
-  // Core glow - bright center
-  const coreColor = new THREE.Color().setHSL(0.6, 0.5, 0.8);
-  emitParticle(x, y, z, dx * 0.1, dy * 0.1, dz * 0.1, 0.6, 1.2 * depthScale, coreColor);
+  // Bright core - white/blue center
+  const coreColor = new THREE.Color().setHSL(0.6, 0.3, 0.9);
+  emitParticle(x, y, z, dx * 0.05, dy * 0.05, dz * 0.05, 0.6, 1.8 * depthScale, coreColor);
   
+  // Inner glow ring
+  for(let i = 0; i < 3; i++){
+    const angle = Math.random() * Math.PI * 2;
+    const r = 0.2 + Math.random() * 0.3;
+    const innerColor = new THREE.Color().setHSL(0.7, 0.6, 0.75);
+    emitParticle(
+      x + Math.cos(angle) * r,
+      y + Math.sin(angle) * r,
+      z + (Math.random() - 0.5) * 0.2,
+      0, 0, 0,
+      0.7, 1.2 * depthScale, innerColor
+    );
+  }
+  
+  // Outer cloud particles
   for(let i = 0; i < count; i++){
-    // Spherical distribution
     const theta = Math.random() * Math.PI * 2;
     const phi = Math.acos(2 * Math.random() - 1);
-    const radius = 0.3 + Math.random() * 1.5;
+    const radius = 0.5 + Math.random() * 1.8;
     
     const nx = Math.sin(phi) * Math.cos(theta) * radius;
     const ny = Math.sin(phi) * Math.sin(theta) * radius;
-    const nz = Math.cos(phi) * radius * 0.6;
+    const nz = Math.cos(phi) * radius * 0.5;
     
-    // Pick a random color from palette
     const palette = colorPalettes[Math.floor(Math.random() * colorPalettes.length)];
     const color = new THREE.Color().setHSL(
-      palette.h + (Math.random() - 0.5) * 0.1,
+      palette.h + (Math.random() - 0.5) * 0.08,
       palette.s,
-      palette.l + Math.random() * 0.2
+      palette.l + (Math.random() - 0.5) * 0.15
     );
+    
+    // Slow expansion
+    const expandSpeed = 0.03;
     
     emitParticle(
       x + nx, y + ny, z + nz,
-      nx * 0.05 + (Math.random() - 0.5) * 0.1,
-      ny * 0.05 + (Math.random() - 0.5) * 0.1,
-      nz * 0.03,
-      palette.h, (0.5 + Math.random() * 0.3) * depthScale, color
+      nx * expandSpeed + (Math.random() - 0.5) * 0.05,
+      ny * expandSpeed + (Math.random() - 0.5) * 0.05,
+      nz * expandSpeed * 0.5,
+      palette.h, (0.6 + Math.random() * 0.4) * depthScale, color
     );
   }
 }
@@ -1098,35 +1114,26 @@ function detectGesture(landmarks) {
   const ringExtended = landmarks[16].y < landmarks[14].y - 0.02;
   const pinkyExtended = landmarks[20].y < landmarks[18].y - 0.02;
   
-  // Peace sign: index and middle extended, others closed
-  if (indexExtended && middleExtended && !ringExtended && !pinkyExtended) {
-    return 'peace';
-  }
-  
-  // Thumbs up: only thumb extended, hand orientation check
+  // Thumbs up: only thumb extended, pointing upward
+  // This is used for Galaxy mode, so don't trigger gesture action
   if (thumbExtended && !indexExtended && !middleExtended && !ringExtended && !pinkyExtended) {
-    // Check if thumb is pointing up (thumb tip above thumb base)
     if (landmarks[4].y < landmarks[2].y) {
-      return 'thumbsUp';
+      return null; // Galaxy mode, not a gesture
     }
   }
   
-  // Open palm: all fingers extended
-  if (indexExtended && middleExtended && ringExtended && pinkyExtended) {
-    return 'openPalm';
+  // Open palm: all fingers + thumb extended
+  // This is used for Nebula mode, so don't trigger gesture action
+  if (thumbExtended && indexExtended && middleExtended && ringExtended && pinkyExtended) {
+    return null; // Nebula mode, not a gesture
   }
   
-  // Fist: all fingers closed
+  // Fist: all fingers closed - toggle hand visualization
   if (!indexExtended && !middleExtended && !ringExtended && !pinkyExtended && !thumbExtended) {
     return 'fist';
   }
   
-  // Pointing: only index extended
-  if (indexExtended && !middleExtended && !ringExtended && !pinkyExtended) {
-    return 'pointing';
-  }
-  
-  // Rock: index and pinky extended
+  // Rock: index and pinky extended - cycle themes
   if (indexExtended && !middleExtended && !ringExtended && pinkyExtended) {
     return 'rock';
   }
@@ -1138,35 +1145,10 @@ function detectGesture(landmarks) {
 let lastGestureTime = 0;
 function handleGesture(gesture) {
   const now = Date.now();
-  if (now - lastGestureTime < 500) return; // Debounce 500ms
+  if (now - lastGestureTime < 1000) return; // Debounce 1 second
   lastGestureTime = now;
   
   switch (gesture) {
-    case 'peace':
-      // Cycle bloom intensity
-      const bloomValues = [0, 1.5, 3.0];
-      const currentIndex = bloomValues.indexOf(settings.bloomStrength);
-      settings.bloomStrength = bloomValues[(currentIndex + 1) % bloomValues.length];
-      bloomPass.strength = settings.bloomStrength;
-      document.getElementById('bloomSlider').value = settings.bloomStrength;
-      document.getElementById('bloomValue').textContent = settings.bloomStrength.toFixed(1);
-      break;
-      
-    case 'thumbsUp':
-      // Save preset
-      document.getElementById('savePresetBtn').click();
-      break;
-      
-    case 'openPalm':
-      // Clear all particles
-      for (let i = 0; i < MAX_PARTICLES; i++) {
-        lifetimes[i] = -1;
-        positions[i * 3 + 1] = -999;
-      }
-      trailHistory1.length = 0;
-      trailHistory2.length = 0;
-      break;
-      
     case 'fist':
       // Toggle hand visualization
       settings.showHandMap = !settings.showHandMap;
